@@ -68,22 +68,7 @@ function waktuWIB(date){
   return new Date(date.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
 }
 
-function hitungHari(masuk){
 
-  let now = waktuWIB(new Date());
-  let masukW = waktuWIB(masuk);
-
-  let masukJam = masukW.getHours();
-  let keluarJam = now.getHours();
-
-  let selisihHari = Math.ceil((now - masukW) / (1000*60*60*24));
-
-  if (masukJam >= 21 && selisihHari == 1 && keluarJam <= 6){
-    return 1;
-  }
-
-  return selisihHari < 1 ? 1 : selisihHari;
-}
 
 function tampilKosong(qr){
   document.getElementById("result").innerHTML =
@@ -95,7 +80,27 @@ function tampilKosong(qr){
 function tampilAktif(qr, masuk){
 
   let hari = hitungHari(masuk);
-  let total = hari * 3000;
+  let total = hari function hitungHari(masuk){
+
+  let now = waktuWIB(new Date());
+  let masukW = waktuWIB(masuk);
+
+  // ambil tanggal saja (tanpa jam)
+  let tMasuk = new Date(masukW.getFullYear(), masukW.getMonth(), masukW.getDate());
+  let tKeluar = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let selisihHari = Math.floor((tKeluar - tMasuk) / (1000*60*60*24));
+
+  let masukJam = masukW.getHours();
+  let keluarJam = now.getHours();
+
+  // aturan malam
+  if (masukJam >= 21 && selisihHari == 1 && keluarJam <= 6){
+    return 1;
+  }
+
+  return selisihHari + 1;
+  }* 3000;
   let rupiah = total.toLocaleString("id-ID");
   let jamMasuk = waktuWIB(masuk).toLocaleString();
 
