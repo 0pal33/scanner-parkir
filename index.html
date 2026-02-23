@@ -9,37 +9,15 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <style>
-body {
-  margin:0;
-  font-family:sans-serif;
-  text-align:center;
-  background:#f5f5f5;
-}
-
-#reader {
-  width:100%;
-}
-
-button {
-  width:90%;
-  padding:20px;
-  font-size:22px;
-  margin:10px;
-  border:none;
-  border-radius:12px;
-}
-
-.green { background:green; color:white; }
-.red { background:red; color:white; }
-.blue { background:#007bff; color:white; }
-
-#result {
-  margin-top:15px;
-  font-size:18px;
-}
+body {margin:0;font-family:sans-serif;text-align:center;background:#f5f5f5;}
+#reader {width:100%;}
+button {width:90%;padding:20px;font-size:22px;margin:10px;border:none;border-radius:12px;}
+.green {background:green;color:white;}
+.red {background:red;color:white;}
+.blue {background:#007bff;color:white;}
 </style>
-
 </head>
+
 <body>
 
 <h2>Scan QR Parkir</h2>
@@ -51,7 +29,6 @@ button {
 
 <script>
 
-// 🔹 Firebase config (pakai yang sama)
 const firebaseConfig = {
   apiKey: "AIzaSyCbB2eqYAxCM1DvkSyCyoqKwq39mvCBwCQ",
   authDomain: "parkir-demo.firebaseapp.com",
@@ -68,7 +45,25 @@ function waktuWIB(date){
   return new Date(date.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
 }
 
+function hitungHari(masuk){
 
+  let now = waktuWIB(new Date());
+  let masukW = waktuWIB(masuk);
+
+  let tMasuk = new Date(masukW.getFullYear(), masukW.getMonth(), masukW.getDate());
+  let tKeluar = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  let selisihHari = Math.floor((tKeluar - tMasuk) / (1000*60*60*24));
+
+  let masukJam = masukW.getHours();
+  let keluarJam = now.getHours();
+
+  if (masukJam >= 21 && selisihHari == 1 && keluarJam <= 6){
+    return 1;
+  }
+
+  return selisihHari + 1;
+}
 
 function tampilKosong(qr){
   document.getElementById("result").innerHTML =
@@ -80,27 +75,7 @@ function tampilKosong(qr){
 function tampilAktif(qr, masuk){
 
   let hari = hitungHari(masuk);
-  let total = hari function hitungHari(masuk){
-
-  let now = waktuWIB(new Date());
-  let masukW = waktuWIB(masuk);
-
-  // ambil tanggal saja (tanpa jam)
-  let tMasuk = new Date(masukW.getFullYear(), masukW.getMonth(), masukW.getDate());
-  let tKeluar = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  let selisihHari = Math.floor((tKeluar - tMasuk) / (1000*60*60*24));
-
-  let masukJam = masukW.getHours();
-  let keluarJam = now.getHours();
-
-  // aturan malam
-  if (masukJam >= 21 && selisihHari == 1 && keluarJam <= 6){
-    return 1;
-  }
-
-  return selisihHari + 1;
-  }* 3000;
+  let total = hari * 3000;
   let rupiah = total.toLocaleString("id-ID");
   let jamMasuk = waktuWIB(masuk).toLocaleString();
 
@@ -118,53 +93,32 @@ function onScanSuccess(qr){
   let docRef = db.collection("parkir").doc(qr);
 
   docRef.get().then((doc)=>{
-
     if(!doc.exists){
       tampilKosong(qr);
     }else{
       tampilAktif(qr, doc.data().checkin.toDate());
     }
-
   });
 }
 
 function checkIn(qr){
-
-  db.collection("parkir").doc(qr).set({
-    checkin: new Date()
-  });
-
-  document.getElementById("result").innerHTML =
-  `<h3>${qr}</h3>
-   <p>Status: AKTIF</p>
-   <p>Motor berhasil masuk</p>`;
+  db.collection("parkir").doc(qr).set({checkin:new Date()});
+  tampilAktif(qr,new Date());
 }
 
 function checkOut(qr){
-
   let konfirmasi = confirm("Motor keluar?");
   if(!konfirmasi) return;
-
   db.collection("parkir").doc(qr).delete();
-
-  document.getElementById("result").innerHTML =
-  `<h3>${qr}</h3>
-   <p>Status: KOSONG</p>
-   <p>Slot siap dipakai</p>`;
+  tampilKosong(qr);
 }
 
 function manualInput(){
   let manual = prompt("Masukkan kode QR:");
-  if(manual){
-    onScanSuccess(manual);
-  }
+  if(manual){ onScanSuccess(manual); }
 }
 
-let scanner = new Html5QrcodeScanner(
-  "reader",
-  { fps: 10, qrbox: 300 }
-);
-
+let scanner = new Html5QrcodeScanner("reader",{fps:10,qrbox:300});
 scanner.render(onScanSuccess);
 
 </script>
