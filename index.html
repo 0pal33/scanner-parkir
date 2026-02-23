@@ -41,29 +41,29 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-function waktuWIB(date){
-  return new Date(date.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
-}
-
+// ===== HITUNG HARI WIB FINAL =====
 function hitungHari(masuk){
 
-  let now = waktuWIB(new Date());
-  let masukW = waktuWIB(masuk);
+  let now = new Date();
+
+  let masukW = new Date(masuk.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
+  let nowW   = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
 
   let tMasuk = new Date(masukW.getFullYear(), masukW.getMonth(), masukW.getDate());
-  let tKeluar = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  let tNow   = new Date(nowW.getFullYear(), nowW.getMonth(), nowW.getDate());
 
-  let selisihHari = Math.floor((tKeluar - tMasuk) / (1000*60*60*24));
+  let selisihTanggal = Math.round((tNow - tMasuk)/(1000*60*60*24));
 
-  let masukJam = masukW.getHours();
-  let keluarJam = now.getHours();
+  let jamMasuk = masukW.getHours();
+  let jamNow   = nowW.getHours();
 
-  if (masukJam >= 21 && selisihHari == 1 && keluarJam <= 6){
+  if (jamMasuk >= 21 && selisihTanggal == 1 && jamNow <= 6){
     return 1;
   }
 
-  return selisihHari + 1;
+  return selisihTanggal + 1;
 }
+// ===============================
 
 function tampilKosong(qr){
   document.getElementById("result").innerHTML =
@@ -77,12 +77,10 @@ function tampilAktif(qr, masuk){
   let hari = hitungHari(masuk);
   let total = hari * 3000;
   let rupiah = total.toLocaleString("id-ID");
-  let jamMasuk = waktuWIB(masuk).toLocaleString();
 
   document.getElementById("result").innerHTML =
   `<h3>${qr}</h3>
    <p>Status: AKTIF</p>
-   <p>Masuk: ${jamMasuk}</p>
    <p>Lama: ${hari} hari</p>
    <p>Tagihan: Rp ${rupiah}</p>
    <button class="red" onclick="checkOut('${qr}')">CHECK-OUT</button>`;
