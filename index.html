@@ -41,7 +41,7 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ===== HITUNG HARI WIB FINAL =====
+// ===== LOGIKA FINAL WIB =====
 function hitungHari(masuk){
 
   let now = new Date();
@@ -52,18 +52,31 @@ function hitungHari(masuk){
   let tMasuk = new Date(masukW.getFullYear(), masukW.getMonth(), masukW.getDate());
   let tNow   = new Date(nowW.getFullYear(), nowW.getMonth(), nowW.getDate());
 
-  let selisihTanggal = Math.round((tNow - tMasuk)/(1000*60*60*24));
+  let bedaTanggal = Math.round((tNow - tMasuk)/(1000*60*60*24));
 
   let jamMasuk = masukW.getHours();
   let jamNow   = nowW.getHours();
 
-  if (jamMasuk >= 21 && selisihTanggal == 1 && jamNow <= 6){
+  // Hari yang sama
+  if(bedaTanggal == 0){
     return 1;
   }
 
-  return selisihTanggal + 1;
+  // Beda 1 hari
+  if(bedaTanggal == 1){
+
+    // aturan malam
+    if(jamMasuk >= 21 && jamNow <= 6){
+      return 1;
+    }
+
+    return 2;
+  }
+
+  // Lebih dari 1 hari
+  return bedaTanggal + 1;
 }
-// ===============================
+// ===========================
 
 function tampilKosong(qr){
   document.getElementById("result").innerHTML =
