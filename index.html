@@ -10,11 +10,12 @@
 
 <style>
 body {margin:0;font-family:sans-serif;text-align:center;background:#f5f5f5;}
-#reader {width:100%;}
-button {width:90%;padding:20px;font-size:22px;margin:10px;border:none;border-radius:12px;}
+#reader {width:100%;margin-bottom:20px;}
+button {width:90%;padding:20px;font-size:22px;margin:15px;border:none;border-radius:12px;}
 .green {background:green;color:white;}
 .red {background:red;color:white;}
 .blue {background:#007bff;color:white;}
+.black {background:black;color:white;}
 </style>
 </head>
 
@@ -25,7 +26,7 @@ button {width:90%;padding:20px;font-size:22px;margin:10px;border:none;border-rad
 <div id="reader"></div>
 <div id="result"></div>
 
-<button class="blue" onclick="manualInput()">Ketik QR Manual</button>
+<button class="blue" onclick="manualInput()">Ketik Manual</button>
 
 <script>
 
@@ -41,43 +42,45 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ===== LOGIKA FINAL WIB =====
-function hitungHari(masuk){
+// ===== VALIDASI FORMAT QR =====
+function validQR(qr){
+  return /^Parkir-\d{3}$/.test(qr);
+}
+
+// ===== WIB =====
+function getWIB(){
 
   let now = new Date();
+  let wib = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
 
-  let masukW = new Date(masuk.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
-  let nowW   = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
+  return {
+    date: `${wib.getFullYear()}-${wib.getMonth()+1}-${wib.getDate()}`,
+    hour: wib.getHours(),
+    time: wib.toLocaleString("id-ID")
+  };
+}
 
-  let tMasuk = new Date(masukW.getFullYear(), masukW.getMonth(), masukW.getDate());
-  let tNow   = new Date(nowW.getFullYear(), nowW.getMonth(), nowW.getDate());
+// ===== HITUNG HARI =====
+function hitungHari(data){
 
-  let bedaTanggal = Math.round((tNow - tMasuk)/(1000*60*60*24));
+  let now = getWIB();
 
-  let jamMasuk = masukW.getHours();
-  let jamNow   = nowW.getHours();
+  let t1 = new Date(data.tanggal);
+  let t2 = new Date(now.date);
 
-  // Hari yang sama
-  if(bedaTanggal == 0){
-    return 1;
-  }
+  let bedaTanggal = Math.round((t2-t1)/(1000*60*60*24));
 
-  // Beda 1 hari
+  if(bedaTanggal == 0) return 1;
+
   if(bedaTanggal == 1){
-
-    // aturan malam
-    if(jamMasuk >= 21 && jamNow <= 6){
-      return 1;
-    }
-
+    if(data.jam >= 21 && now.hour <= 6) return 1;
     return 2;
   }
 
-  // Lebih dari 1 hari
   return bedaTanggal + 1;
 }
-// ===========================
 
+// ===== UI =====
 function tampilKosong(qr){
   document.getElementById("result").innerHTML =
   `<h3>${qr}</h3>
@@ -85,21 +88,33 @@ function tampilKosong(qr){
    <button class="green" onclick="checkIn('${qr}')">CHECK-IN</button>`;
 }
 
-function tampilAktif(qr, masuk){
+function tampilAktif(qr,data){
 
-  let hari = hitungHari(masuk);
+  let hari = hitungHari(data);
   let total = hari * 3000;
   let rupiah = total.toLocaleString("id-ID");
 
   document.getElementById("result").innerHTML =
   `<h3>${qr}</h3>
    <p>Status: AKTIF</p>
+   <p>Masuk: ${data.waktu}</p>
    <p>Lama: ${hari} hari</p>
    <p>Tagihan: Rp ${rupiah}</p>
    <button class="red" onclick="checkOut('${qr}')">CHECK-OUT</button>`;
 }
 
+function tampilInvalid(){
+  document.getElementById("result").innerHTML =
+  `<p>QR tidak valid</p>`;
+}
+
+// ===== SCAN =====
 function onScanSuccess(qr){
+
+  if(!validQR(qr)){
+    tampilInvalid();
+    return;
+  }
 
   let docRef = db.collection("parkir").doc(qr);
 
@@ -107,16 +122,30 @@ function onScanSuccess(qr){
     if(!doc.exists){
       tampilKosong(qr);
     }else{
-      tampilAktif(qr, doc.data().checkin.toDate());
+      tampilAktif(qr, doc.data());
     }
   });
 }
 
+// ===== CHECK-IN =====
 function checkIn(qr){
-  db.collection("parkir").doc(qr).set({checkin:new Date()});
-  tampilAktif(qr,new Date());
+
+  let now = getWIB();
+
+  db.collection("parkir").doc(qr).set({
+    tanggal: now.date,
+    jam: now.hour,
+    waktu: now.time
+  });
+
+  tampilAktif(qr,{
+    tanggal: now.date,
+    jam: now.hour,
+    waktu: now.time
+  });
 }
 
+// ===== CHECK-OUT =====
 function checkOut(qr){
   let konfirmasi = confirm("Motor keluar?");
   if(!konfirmasi) return;
@@ -124,12 +153,29 @@ function checkOut(qr){
   tampilKosong(qr);
 }
 
+// ===== MANUAL =====
 function manualInput(){
-  let manual = prompt("Masukkan kode QR:");
-  if(manual){ onScanSuccess(manual); }
+
+  let angka = prompt("Masukkan angka parkir (contoh: 123)");
+
+  if(!angka) return;
+
+  if(!/^\d{3}$/.test(angka)){
+    alert("Harus 3 digit");
+    return;
+  }
+
+  let qr = "Parkir-" + angka;
+
+  onScanSuccess(qr);
 }
 
-let scanner = new Html5QrcodeScanner("reader",{fps:10,qrbox:300});
+// ===== SCANNER =====
+let scanner = new Html5QrcodeScanner(
+  "reader",
+  { fps: 10, qrbox: 300 }
+);
+
 scanner.render(onScanSuccess);
 
 </script>
