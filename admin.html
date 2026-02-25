@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin Wayahe Parkir</title>
+
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+
+</head>
+
+<body style="text-align:center;font-family:sans-serif">
+
+<h2>Dashboard Admin</h2>
+<button onclick="logout()">Logout</button>
+
+<script>
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCbB2eqYAxCM1DvkSyCyoqKwq39mvCBwCQ",
+  authDomain: "parkir-demo.firebaseapp.com",
+  projectId: "parkir-demo",
+  storageBucket: "parkir-demo.firebasestorage.app",
+  messagingSenderId: "962001897575",
+  appId: "1:962001897575:web:811c1902e3a274f7bb6cc2"
+};
+
+firebase.initializeApp(firebaseConfig);
+
+firebase.auth().onAuthStateChanged(user=>{
+if(!user){
+window.location.href="/";
+}
+});
+
+function logout(){
+firebase.auth().signOut();
+window.location.href="/";
+}
+
+</script>
+
+</body>
+  </html>
