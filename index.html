@@ -100,12 +100,13 @@ document.getElementById("result").innerHTML =
 let data = doc.data();
 let hari = hitungHari(data);
 let total = hari*3000;
+
 document.getElementById("result").innerHTML =
 `<h3>${qr}</h3>
 <p>Masuk: ${data.waktu}</p>
 <p>Lama: ${hari} hari</p>
 <p>Tagihan: Rp ${total.toLocaleString("id-ID")}</p>
-<button class="red" onclick="checkOut('${qr}')">CHECKOUT SEKARANG</button>`;
+<button class="red" onclick="checkOut('${qr}',${total})">CHECKOUT SEKARANG</button>`;
 }
 });
 }
@@ -120,10 +121,24 @@ waktu: now.time
 });
 }
 
-// CHECKOUT
-function checkOut(qr){
+// CHECKOUT + SIMPAN LAPORAN
+function checkOut(qr,total){
+
 if(!confirm("Motor keluar?")) return;
+
+let now=getWIB();
+
+// simpan laporan
+db.collection("checkout").add({
+qr: qr,
+bayar: total,
+tanggal: now.date,
+waktu: now.time
+});
+
+// hapus parkir aktif
 db.collection("parkir").doc(qr).delete();
+
 document.getElementById("result").innerHTML="";
 }
 
