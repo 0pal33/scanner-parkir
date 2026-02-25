@@ -1,53 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wayahe Parkir</title>
 
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#000000">
 
 <script src="https://unpkg.com/html5-qrcode"></script>
+
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <style>
-body {margin:0;background:#f5f5f5;font-family:sans-serif;text-align:center;}
-
-#reader {
-width:85%;
-margin:20px auto;
-border-radius:16px;
-overflow:hidden;
-}
-
-button {
-width:90%;
-padding:18px;
-font-size:20px;
-margin:10px;
-border:none;
-border-radius:12px;
-}
-
+body {margin:0;background:#f5f5f5;text-align:center;font-family:sans-serif;}
+#reader {width:85%;margin:20px auto;border-radius:16px;overflow:hidden;}
+button {width:90%;padding:18px;font-size:20px;margin:10px;border:none;border-radius:12px;}
 .start {background:black;color:white;}
 .stop {background:red;color:white;}
 .green {background:green;color:white;}
 .red {background:red;color:white;}
 .blue {background:#007bff;color:white;}
-
-.switchCam {
-position:fixed;
-bottom:120px;
-right:20px;
-background:#444;
-color:white;
-width:60px;
-height:60px;
-border-radius:50%;
-font-size:20px;
-}
-
 </style>
 </head>
 
@@ -59,7 +32,7 @@ font-size:20px;
 <button class="start" onclick="startScan()">START SCANNING</button>
 <button class="stop" onclick="stopScan()">STOP SCANNING</button>
 <button class="blue" onclick="manualInput()">Ketik Manual</button>
-<button class="switchCam" onclick="switchCamera()">🔄</button>
+<button class="blue" onclick="adminLogin()">Login Admin</button>
 
 <script>
 
@@ -100,7 +73,6 @@ let now = getWIB();
 let t1 = new Date(data.tanggal);
 let t2 = new Date(now.date);
 let beda = Math.round((t2-t1)/(1000*60*60*24));
-
 if(beda==0) return 1;
 if(beda==1){
 if(data.jam>=21 && now.hour<=6) return 1;
@@ -179,11 +151,20 @@ html5QrCode.stop();
 }
 }
 
-// SWITCH
-function switchCamera(){
-currentCamera = currentCamera=="environment"?"user":"environment";
-stopScan();
-startScan();
+// LOGIN ADMIN
+function adminLogin(){
+
+let email = prompt("Email admin:");
+let password = prompt("Password:");
+
+firebase.auth().signInWithEmailAndPassword(email,password)
+.then(()=>{
+alert("Login berhasil");
+window.location.href="admin.html";
+})
+.catch(()=>{
+alert("Login gagal");
+});
 }
 
 </script>
