@@ -16,6 +16,10 @@
 
 <p id="role"></p>
 
+<h3>Laporan Hari Ini</h3>
+<p>Checkout: <span id="count">0</span></p>
+<p>Total: Rp <span id="total">0</span></p>
+
 <div id="menu"></div>
 
 <button onclick="logout()">Logout</button>
@@ -46,34 +50,46 @@ return;
 
 let role = "viewer";
 
-if(user.email == ownerEmail){
-role = "owner";
-}
-
-if(user.email == editorEmail){
-role = "editor";
-}
+if(user.email == ownerEmail){ role = "owner"; }
+if(user.email == editorEmail){ role = "editor"; }
 
 document.getElementById("role").innerHTML = "Role: " + role;
 
-if(role == "owner"){
-document.getElementById("menu").innerHTML =
-`<p>Anda pemilik sistem</p>
-<button onclick="editTarif()">Edit Tarif</button>`;
-}
+loadReport();
 
-if(role == "editor"){
+if(role == "owner" || role == "editor"){
 document.getElementById("menu").innerHTML =
-`<p>Anda editor</p>
-<button onclick="editTarif()">Edit Tarif</button>`;
-}
-
-if(role == "viewer"){
+`<button onclick="editTarif()">Edit Tarif</button>`;
+}else{
 document.getElementById("menu").innerHTML =
 `<p>Akses hanya melihat</p>`;
 }
 
 });
+
+// LOAD REPORT
+function loadReport(){
+
+let today = new Date().toISOString().split("T")[0];
+
+db.collection("checkout")
+.where("tanggal","==",today)
+.get()
+.then(snapshot=>{
+
+let count = snapshot.size;
+let total = 0;
+
+snapshot.forEach(doc=>{
+total += doc.data().bayar;
+});
+
+document.getElementById("count").innerHTML = count;
+document.getElementById("total").innerHTML = total.toLocaleString("id-ID");
+
+});
+
+}
 
 function editTarif(){
 alert("Fitur edit tarif akan dibuat selanjutnya");
