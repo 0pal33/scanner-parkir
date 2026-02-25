@@ -5,13 +5,11 @@
 <title>Wayahe Parkir</title>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
-
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <style>
 body { text-align:center; font-family:Arial; background:#f5f5f5; margin:0; padding:20px; }
-
 #reader { width:260px; margin:auto; border-radius:20px; overflow:hidden; }
 
 button {
@@ -66,26 +64,44 @@ const db = firebase.firestore();
 let html5QrCode;
 let lastQR = null;
 
-// WIB time
+// WIB
 function nowWIB(){
  let d = new Date();
  return new Date(d.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
 }
 
-// hitung hari
-function hitungHari(masuk){
- let now = nowWIB();
- let m = new Date(masuk);
+// parse masuk (timestamp atau string)
+function parseMasuk(val){
 
- let diff = Math.ceil((now - m)/(1000*60*60*24));
+ if(!val) return null;
+
+ if(typeof val === "string"){
+   return new Date(val);
+ }
+
+ if(val.toDate){
+   return val.toDate();
+ }
+
+ return new Date(val);
+}
+
+// hitung hari
+function hitungHari(masukVal){
+
+ let masuk = parseMasuk(masukVal);
+ if(!masuk) return 0;
+
+ let now = nowWIB();
+
+ let diff = Math.ceil((now - masuk)/(1000*60*60*24));
  if(diff<1) diff=1;
 
- // special rule
- let jamMasuk = m.getHours();
+ let jamMasuk = masuk.getHours();
  let jamNow = now.getHours();
 
  if(jamMasuk>=21 && jamMasuk<=23){
-   let bedaHari = now.getDate() - m.getDate();
+   let bedaHari = now.getDate() - masuk.getDate();
    if(bedaHari==1 && jamNow<=6) diff=1;
  }
 
@@ -110,7 +126,7 @@ function stopScan(){
  stopBtn.style.display="none";
 }
 
-// handle scan
+// handle QR
 async function handleQR(qr){
  if(!qr.startsWith("Parkir-")) return;
  lastQR=qr;
@@ -124,12 +140,14 @@ async function handleQR(qr){
    cancelBtn.style.display="none";
  }
  else{
-   let masuk = doc.data().masuk;
-   let hari = hitungHari(masuk);
+   let masukVal = doc.data().masuk;
+   let hari = hitungHari(masukVal);
    let tarif = hari * 3000;
 
+   let masuk = parseMasuk(masukVal);
+
    info.innerHTML=
-   "Masuk: "+ new Date(masuk).toLocaleString()+
+   "Masuk: "+ masuk.toLocaleString("id-ID")+
    "<br>Lama: "+hari+" hari"+
    "<br>Tagihan: Rp "+tarif;
 
@@ -149,7 +167,7 @@ function manualInput(){
 // checkin
 async function checkin(){
  await db.collection("parkir").doc(lastQR).set({
-   masuk: nowWIB().toISOString()
+   masuk: nowWIB()
  });
  alert("Checkin sukses");
 }
@@ -163,6 +181,7 @@ async function checkout(){
    qr:lastQR,
    hari:hari,
    bayar:hari*3000,
+   tanggal: nowWIB().toLocaleDateString("id-ID"),
    waktu: nowWIB().toISOString()
  });
 
