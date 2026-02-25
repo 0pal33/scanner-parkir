@@ -1,51 +1,78 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wayahe Parkir</title>
 
-<script src="https://unpkg.com/html5-qrcode"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+
+<link rel="manifest" href="manifest.json">
+
+<title>Scanner Parkir</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js"></script>
 
 <style>
-body { text-align:center; font-family:Arial; background:#f5f5f5; margin:0; padding:20px; }
-#reader { width:260px; margin:auto; border-radius:20px; overflow:hidden; }
 
-button {
- width:90%;
- padding:16px;
- margin:10px;
- border:none;
- border-radius:14px;
- font-size:18px;
+body{
+font-family:Arial;
+background:#eee;
+text-align:center;
+margin:0;
+padding:15px;
 }
 
-.start{background:black;color:white;}
-.stop{background:red;color:white;}
-.checkin{background:green;color:white;}
-.checkout{background:red;color:white;}
-.cancel{background:orange;color:white;}
-.manual{background:#2d77c7;color:white;}
-.admin{background:#555;color:white;}
+button{
+width:90%;
+padding:18px;
+margin:10px auto;
+border:none;
+border-radius:12px;
+font-size:18px;
+color:white;
+display:block;
+}
+
+.start{background:black;}
+.stop{background:red;}
+.checkin{background:green;}
+.checkout{background:red;}
+.batal{background:orange;}
+.manual{background:#3b82f6;}
+.login{background:#666;}
+
+#video{
+width:90%;
+max-width:400px;
+border-radius:15px;
+margin:15px auto;
+display:block;
+}
+
+.info{
+margin-top:10px;
+font-size:18px;
+}
+
 </style>
+
 </head>
 
 <body>
 
-<div id="reader"></div>
+<video id="video" autoplay></video>
 
-<button id="startBtn" class="start" onclick="startScan()">START SCANNING</button>
-<button id="stopBtn" class="stop" onclick="stopScan()" style="display:none;">STOP SCANNING</button>
+<button id="startBtn" class="start">START SCANNING</button>
+<button id="stopBtn" class="stop" style="display:none;">STOP SCANNING</button>
 
-<div id="info"></div>
+<div id="info" class="info"></div>
 
-<button id="checkinBtn" class="checkin" style="display:none;" onclick="checkin()">CHECK-IN</button>
-<button id="checkoutBtn" class="checkout" style="display:none;" onclick="checkout()">CHECKOUT SEKARANG</button>
-<button id="cancelBtn" class="cancel" style="display:none;" onclick="cancel()">BATALKAN PARKIR</button>
+<button id="checkinBtn" class="checkin" style="display:none;">CHECK-IN</button>
+<button id="checkoutBtn" class="checkout" style="display:none;">CHECKOUT SEKARANG</button>
+<button id="batalBtn" class="batal" style="display:none;">BATALKAN PARKIR</button>
 
-<button class="manual" onclick="manualInput()">Ketik Manual</button>
-<button class="admin" onclick="location.href='admin.html'">Login Admin</button>
+<button id="manualBtn" class="manual">Ketik Manual</button>
+<button id="loginBtn" class="login">Login Admin</button>
 
 <script>
 
@@ -60,148 +87,205 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
 
-let html5QrCode;
-let lastQR = null;
+let currentQR = null;
+let stream = null;
 
-// WIB
-function nowWIB(){
- let d = new Date();
- return new Date(d.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
-}
 
-// parse masuk aman
-function parseMasuk(val){
+// ====== PARSER DATA LAMA & BARU ======
+function parseMasukWIB(masuk){
 
- if(!val) return null;
+ if(!masuk) return null;
+
+ if(masuk.includes("T")){
+   return new Date(masuk);
+ }
 
  try{
-   if(typeof val === "string") return new Date(val);
-   if(val.toDate) return val.toDate();
-   return new Date(val);
+   let [tgl,jam] = masuk.split(", ");
+   let [d,m,y] = tgl.split("/");
+   let [h,i,s] = jam.split(".");
+
+   return new Date(y, m-1, d, h, i, s);
+
  }catch{
    return null;
  }
 }
 
-// hitung hari aman
-function hitungHari(masukVal){
 
- let masuk = parseMasuk(masukVal);
- if(!masuk || isNaN(masuk)) return 1;
+
+// ===== WIB NOW =====
+function nowWIB(){
+ let now = new Date();
+ return new Date(now.getTime() + (7*60*60*1000));
+}
+
+
+
+// ===== DURASI LOGIC =====
+function hitungDurasi(masuk){
 
  let now = nowWIB();
 
- let diff = Math.ceil((now - masuk)/(1000*60*60*24));
- if(diff<1) diff=1;
-
  let jamMasuk = masuk.getHours();
- let jamNow = now.getHours();
 
- if(jamMasuk>=21 && jamMasuk<=23){
-   let bedaHari = now.getDate() - masuk.getDate();
-   if(bedaHari==1 && jamNow<=6) diff=1;
+ if(jamMasuk >= 21){
+   let besok = new Date(masuk);
+   besok.setDate(besok.getDate()+1);
+   besok.setHours(6,0,0,0);
+
+   if(now < besok) return 1;
  }
 
- return diff;
+ let diff = now - masuk;
+ let hari = Math.ceil(diff / (1000*60*60*24));
+
+ return hari < 1 ? 1 : hari;
 }
 
-// scan
-async function startScan(){
- html5QrCode = new Html5Qrcode("reader");
- const devices = await Html5Qrcode.getCameras();
- const back = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
 
- html5QrCode.start(back.id,{fps:10,qrbox:200},handleQR);
 
- startBtn.style.display="none";
- stopBtn.style.display="block";
+// ===== TAMPIL DATA =====
+function tampilkanData(masuk){
+
+ if(!masuk || isNaN(masuk)){
+   document.getElementById("info").innerHTML="Data lama / rusak<br>Silakan checkout / batalkan";
+   showAction();
+   return;
+ }
+
+ let durasi = hitungDurasi(masuk);
+ let tarif = durasi * 3000;
+
+ document.getElementById("info").innerHTML=
+ "Masuk: "+masuk.toLocaleString('id-ID')+
+ "<br>Lama: "+durasi+" hari"+
+ "<br>Tagihan: Rp "+tarif;
+
+ showAction();
 }
 
-function stopScan(){
- html5QrCode.stop();
- startBtn.style.display="block";
- stopBtn.style.display="none";
+
+
+// ===== BUTTON STATE =====
+function showAction(){
+ document.getElementById("checkinBtn").style.display="none";
+ document.getElementById("checkoutBtn").style.display="block";
+ document.getElementById("batalBtn").style.display="block";
 }
 
-// handle QR
-async function handleQR(qr){
- if(!qr.startsWith("Parkir-")) return;
- lastQR=qr;
+
+
+// ===== SCAN SIMULASI =====
+async function prosesQR(qr){
+
+ currentQR = qr;
 
  let doc = await db.collection("parkir").doc(qr).get();
 
  if(!doc.exists){
-   info.innerHTML="Belum aktif";
-   checkinBtn.style.display="block";
-   checkoutBtn.style.display="none";
-   cancelBtn.style.display="none";
+   document.getElementById("checkinBtn").style.display="block";
+   document.getElementById("checkoutBtn").style.display="none";
+   document.getElementById("batalBtn").style.display="none";
+   return;
  }
- else{
 
-   let masukVal = doc.data().masuk;
-   let masuk = parseMasuk(masukVal);
+ let data = doc.data();
+ let masuk = parseMasukWIB(data.masuk);
 
-   if(!masuk || isNaN(masuk)){
-     info.innerHTML="Data lama / rusak<br>Silakan checkout / batalkan";
-     checkinBtn.style.display="none";
-     checkoutBtn.style.display="block";
-     cancelBtn.style.display="block";
-     return;
-   }
+ tampilkanData(masuk);
 
-   let hari = hitungHari(masukVal);
-   let tarif = hari * 3000;
-
-   info.innerHTML=
-   "Masuk: "+ masuk.toLocaleString("id-ID")+
-   "<br>Lama: "+hari+" hari"+
-   "<br>Tagihan: Rp "+tarif;
-
-   checkinBtn.style.display="none";
-   checkoutBtn.style.display="block";
-   cancelBtn.style.display="block";
+ // AUTO MIGRASI FORMAT LAMA
+ if(data.masuk && !data.masuk.includes("T")){
+   await db.collection("parkir").doc(qr).update({
+     masuk: masuk.toISOString()
+   });
  }
+
 }
 
-// manual
-function manualInput(){
- let num=prompt("Masukkan nomor:");
- if(!num) return;
- handleQR("Parkir-"+num);
-}
 
-// checkin
-async function checkin(){
- await db.collection("parkir").doc(lastQR).set({
-   masuk: nowWIB().toISOString()
+
+// ===== CHECKIN =====
+document.getElementById("checkinBtn").onclick = async ()=>{
+ let now = new Date().toISOString();
+
+ await db.collection("parkir").doc(currentQR).set({
+   masuk: now
  });
- alert("Checkin sukses");
-}
 
-// checkout
-async function checkout(){
- let doc = await db.collection("parkir").doc(lastQR).get();
- let hari = hitungHari(doc.data().masuk);
+ alert("Check-in berhasil");
+};
+
+
+
+// ===== CHECKOUT =====
+document.getElementById("checkoutBtn").onclick = async ()=>{
+
+ let doc = await db.collection("parkir").doc(currentQR).get();
+
+ if(!doc.exists) return;
+
+ let masuk = parseMasukWIB(doc.data().masuk);
+ let durasi = hitungDurasi(masuk);
+ let bayar = durasi * 3000;
+
+ let now = nowWIB();
 
  await db.collection("checkout").add({
-   qr:lastQR,
-   hari:hari,
-   bayar:hari*3000,
-   tanggal: nowWIB().toLocaleDateString("id-ID"),
-   waktu: nowWIB().toISOString()
+   qr: currentQR,
+   bayar: bayar,
+   tanggal: now.toISOString().split("T")[0],
+   waktu: now.toLocaleString('id-ID')
  });
 
- await db.collection("parkir").doc(lastQR).delete();
- alert("Checkout sukses");
-}
+ await db.collection("parkir").doc(currentQR).delete();
 
-// batal
-async function cancel(){
- await db.collection("parkir").doc(lastQR).delete();
+ alert("Checkout sukses");
+};
+
+
+
+// ===== BATAL =====
+document.getElementById("batalBtn").onclick = async ()=>{
+ await db.collection("parkir").doc(currentQR).delete();
  alert("Parkir dibatalkan");
-}
+};
+
+
+
+// ===== START CAMERA =====
+document.getElementById("startBtn").onclick = async ()=>{
+ stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+ document.getElementById("video").srcObject = stream;
+
+ document.getElementById("startBtn").style.display="none";
+ document.getElementById("stopBtn").style.display="block";
+};
+
+
+
+// ===== STOP CAMERA =====
+document.getElementById("stopBtn").onclick = ()=>{
+ stream.getTracks().forEach(track=>track.stop());
+ document.getElementById("startBtn").style.display="block";
+ document.getElementById("stopBtn").style.display="none";
+};
+
+
+
+// ===== LOGIN ADMIN =====
+document.getElementById("loginBtn").onclick = async ()=>{
+ let email = prompt("Email");
+ let pass = prompt("Password");
+
+ await auth.signInWithEmailAndPassword(email,pass);
+ window.location="admin.html";
+};
 
 </script>
+
 </body>
 </html>
