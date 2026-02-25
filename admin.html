@@ -28,12 +28,13 @@ button {
 .login{background:black;color:white;}
 .logout{background:red;color:white;}
 .edit{background:orange;color:white;}
+.box{background:white;padding:15px;margin:10px;border-radius:12px;}
 </style>
 </head>
 
 <body>
 
-<h2>Admin Wayahe Parkir</h2>
+<h2>Dashboard Admin</h2>
 
 <div id="loginBox">
 <input id="email" placeholder="Email">
@@ -45,9 +46,23 @@ button {
 
 <h3 id="roleText"></h3>
 
-<h2>Laporan Hari Ini</h2>
-<p>Checkout: <span id="jumlah">0</span></p>
-<p>Total: Rp <span id="total">0</span></p>
+<div class="box">
+<h3>Hari Ini</h3>
+Checkout: <span id="hariCount">0</span><br>
+Total: Rp <span id="hariTotal">0</span>
+</div>
+
+<div class="box">
+<h3>Minggu Ini</h3>
+Checkout: <span id="mingguCount">0</span><br>
+Total: Rp <span id="mingguTotal">0</span>
+</div>
+
+<div class="box">
+<h3>Bulan Ini</h3>
+Checkout: <span id="bulanCount">0</span><br>
+Total: Rp <span id="bulanTotal">0</span>
+</div>
 
 <button class="edit" onclick="editTarif()">Edit Tarif</button>
 <button class="logout" onclick="logout()">Logout</button>
@@ -69,6 +84,18 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
+function formatTanggal(date){
+ let d = date.getDate();
+ let m = date.getMonth()+1;
+ let y = date.getFullYear();
+ return d+"/"+m+"/"+y;
+}
+
+function parseTanggal(str){
+ let p = str.split("/");
+ return new Date(p[2],p[1]-1,p[0]);
+}
+
 async function login(){
  let email=document.getElementById("email").value;
  let pass=document.getElementById("password").value;
@@ -81,13 +108,10 @@ auth.onAuthStateChanged(async user=>{
    let roleDoc = await db.collection("roles").doc(user.email).get();
 
    if(roleDoc.exists){
-
      document.getElementById("loginBox").style.display="none";
      document.getElementById("dashboard").style.display="block";
      document.getElementById("roleText").innerHTML="Role: "+roleDoc.data().role;
-
      loadLaporan();
-
    }
 
  } else {
@@ -102,22 +126,49 @@ function logout(){
 
 async function loadLaporan(){
 
- let today = new Date().toISOString().slice(0,10);
+ let snapshot = await db.collection("checkout").get();
 
- let snapshot = await db.collection("checkout")
-   .where("tanggal","==",today)
-   .get();
+ let today = new Date();
+ let minggu = new Date();
+ minggu.setDate(today.getDate()-7);
 
- let jumlah=0;
- let total=0;
+ let bulan = new Date();
+ bulan.setMonth(today.getMonth()-1);
+
+ let hariCount=0, hariTotal=0;
+ let mingguCount=0, mingguTotal=0;
+ let bulanCount=0, bulanTotal=0;
 
  snapshot.forEach(doc=>{
-   jumlah++;
-   total+=doc.data().bayar;
+   let data = doc.data();
+   if(!data.tanggal) return;
+
+   let tgl = parseTanggal(data.tanggal);
+
+   if(formatTanggal(tgl)==formatTanggal(today)){
+     hariCount++;
+     hariTotal+=data.bayar;
+   }
+
+   if(tgl>=minggu){
+     mingguCount++;
+     mingguTotal+=data.bayar;
+   }
+
+   if(tgl>=bulan){
+     bulanCount++;
+     bulanTotal+=data.bayar;
+   }
  });
 
- document.getElementById("jumlah").innerText=jumlah;
- document.getElementById("total").innerText=total;
+ document.getElementById("hariCount").innerText=hariCount;
+ document.getElementById("hariTotal").innerText=hariTotal;
+
+ document.getElementById("mingguCount").innerText=mingguCount;
+ document.getElementById("mingguTotal").innerText=mingguTotal;
+
+ document.getElementById("bulanCount").innerText=bulanCount;
+ document.getElementById("bulanTotal").innerText=bulanTotal;
 
 }
 
