@@ -10,21 +10,8 @@
 
 <style>
 body { font-family:Arial; text-align:center; background:#f5f5f5; padding:20px;}
-input {
- width:90%;
- padding:14px;
- margin:10px;
- border-radius:10px;
- border:1px solid #ccc;
-}
-button {
- width:90%;
- padding:14px;
- margin:10px;
- border:none;
- border-radius:12px;
- font-size:16px;
-}
+input { width:90%; padding:14px; margin:10px; border-radius:10px; border:1px solid #ccc;}
+button { width:90%; padding:14px; margin:10px; border:none; border-radius:12px; font-size:16px;}
 .login{background:black;color:white;}
 .logout{background:red;color:white;}
 .edit{background:orange;color:white;}
@@ -84,16 +71,19 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-function formatTanggal(date){
- let d = date.getDate();
- let m = date.getMonth()+1;
- let y = date.getFullYear();
- return d+"/"+m+"/"+y;
-}
-
 function parseTanggal(str){
- let p = str.split("/");
- return new Date(p[2],p[1]-1,p[0]);
+
+ if(str.includes("/")){
+   let p = str.split("/");
+   return new Date(p[2],p[1]-1,p[0]);
+ }
+
+ if(str.includes("-")){
+   let p = str.split("-");
+   return new Date(p[0],p[1]-1,p[2]);
+ }
+
+ return new Date(str);
 }
 
 async function login(){
@@ -129,6 +119,8 @@ async function loadLaporan(){
  let snapshot = await db.collection("checkout").get();
 
  let today = new Date();
+ today.setHours(0,0,0,0);
+
  let minggu = new Date();
  minggu.setDate(today.getDate()-7);
 
@@ -144,8 +136,9 @@ async function loadLaporan(){
    if(!data.tanggal) return;
 
    let tgl = parseTanggal(data.tanggal);
+   tgl.setHours(0,0,0,0);
 
-   if(formatTanggal(tgl)==formatTanggal(today)){
+   if(tgl.getTime() === today.getTime()){
      hariCount++;
      hariTotal+=data.bayar;
    }
