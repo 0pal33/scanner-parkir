@@ -70,27 +70,25 @@ function nowWIB(){
  return new Date(d.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
 }
 
-// parse masuk (timestamp atau string)
+// parse masuk aman
 function parseMasuk(val){
 
  if(!val) return null;
 
- if(typeof val === "string"){
+ try{
+   if(typeof val === "string") return new Date(val);
+   if(val.toDate) return val.toDate();
    return new Date(val);
+ }catch{
+   return null;
  }
-
- if(val.toDate){
-   return val.toDate();
- }
-
- return new Date(val);
 }
 
-// hitung hari
+// hitung hari aman
 function hitungHari(masukVal){
 
  let masuk = parseMasuk(masukVal);
- if(!masuk) return 0;
+ if(!masuk || isNaN(masuk)) return 1;
 
  let now = nowWIB();
 
@@ -140,11 +138,20 @@ async function handleQR(qr){
    cancelBtn.style.display="none";
  }
  else{
+
    let masukVal = doc.data().masuk;
+   let masuk = parseMasuk(masukVal);
+
+   if(!masuk || isNaN(masuk)){
+     info.innerHTML="Data lama / rusak<br>Silakan checkout / batalkan";
+     checkinBtn.style.display="none";
+     checkoutBtn.style.display="block";
+     cancelBtn.style.display="block";
+     return;
+   }
+
    let hari = hitungHari(masukVal);
    let tarif = hari * 3000;
-
-   let masuk = parseMasuk(masukVal);
 
    info.innerHTML=
    "Masuk: "+ masuk.toLocaleString("id-ID")+
@@ -167,7 +174,7 @@ function manualInput(){
 // checkin
 async function checkin(){
  await db.collection("parkir").doc(lastQR).set({
-   masuk: nowWIB()
+   masuk: nowWIB().toISOString()
  });
  alert("Checkin sukses");
 }
