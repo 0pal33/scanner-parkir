@@ -6,6 +6,8 @@
 
 <link rel="manifest" href="manifest.json">
 
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js"></script>
 <script src="https://unpkg.com/html5-qrcode"></script>
 
 <style>
@@ -35,6 +37,8 @@ button {
 
 .start { background:black; color:white; }
 .stop { background:red; color:white; }
+.checkin { background:green; color:white; }
+.checkout { background:red; color:white; }
 .manual { background:#2d77c7; color:white; }
 .admin { background:#555; color:white; }
 </style>
@@ -47,51 +51,107 @@ button {
 <button id="startBtn" class="start" onclick="startScan()">START SCANNING</button>
 <button id="stopBtn" class="stop" onclick="stopScan()" style="display:none;">STOP SCANNING</button>
 
+<div id="result"></div>
+
+<button id="checkinBtn" class="checkin" style="display:none;" onclick="checkin()">CHECK-IN</button>
+<button id="checkoutBtn" class="checkout" style="display:none;" onclick="checkout()">CHECKOUT SEKARANG</button>
+
 <button class="manual" onclick="manualInput()">Ketik Manual</button>
 <button class="admin" onclick="location.href='admin.html'">Login Admin</button>
 
 <script>
 
+// ==== FIREBASE CONFIG ====
+const firebaseConfig = {
+  apiKey: "AIzaSyCbB2eqYAxCM1DvkSyCyoqKwq39mvCBwCQ",
+  authDomain: "parkir-demo.firebaseapp.com",
+  projectId: "parkir-demo"
+};
+
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ==== SCANNER ====
 let html5QrCode;
-let scanning = false;
-let cameraId;
+let lastQR = null;
 
 async function startScan(){
-
- const devices = await Html5Qrcode.getCameras();
- cameraId = devices.find(d => d.label.toLowerCase().includes("back"))?.id || devices[0].id;
-
  html5QrCode = new Html5Qrcode("reader");
 
+ const devices = await Html5Qrcode.getCameras();
+ const back = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
+
  html5QrCode.start(
-   cameraId,
+   back.id,
    { fps:10, qrbox:200 },
    qr => {
-     alert("QR: "+qr);
+     if(!qr.startsWith("Parkir-")) return;
+
+     lastQR = qr;
+     document.getElementById("result").innerHTML = qr;
+
+     document.getElementById("checkinBtn").style.display="block";
+     document.getElementById("checkoutBtn").style.display="block";
    }
  );
-
- scanning = true;
 
  document.getElementById("startBtn").style.display="none";
  document.getElementById("stopBtn").style.display="block";
 }
 
 function stopScan(){
- if(html5QrCode){
-   html5QrCode.stop();
- }
- scanning=false;
+ if(html5QrCode) html5QrCode.stop();
 
  document.getElementById("startBtn").style.display="block";
  document.getElementById("stopBtn").style.display="none";
 }
 
+// ==== MANUAL ====
 function manualInput(){
  let num = prompt("Masukkan angka parkir:");
- if(num){
-   alert("Parkir-"+num);
- }
+ if(!num) return;
+
+ lastQR = "Parkir-"+num;
+ document.getElementById("result").innerHTML = lastQR;
+
+ document.getElementById("checkinBtn").style.display="block";
+ document.getElementById("checkoutBtn").style.display="block";
+}
+
+// ==== CHECKIN ====
+async function checkin(){
+ if(!lastQR) return;
+
+ await db.collection("parkir").doc(lastQR).set({
+   masuk: new Date().toISOString(),
+   status:"aktif"
+ });
+
+ alert("Check-in sukses");
+}
+
+// ==== CHECKOUT ====
+async function checkout(){
+ if(!lastQR) return;
+
+ const ref = db.collection("parkir").doc(lastQR);
+ const snap = await ref.get();
+
+ if(!snap.exists) return alert("Belum checkin");
+
+ await db.collection("checkout").add({
+   qr:lastQR,
+   waktu:new Date().toLocaleString()
+ });
+
+ await ref.delete();
+
+ alert("Checkout sukses");
+}
+
+// ==== PWA ====
+if('serviceWorker' in navigator){
+ navigator.serviceWorker.register('sw.js');
 }
 
 </script>
