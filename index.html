@@ -159,7 +159,6 @@ let password = prompt("Password:");
 
 firebase.auth().signInWithEmailAndPassword(email,password)
 .then(()=>{
-alert("Login berhasil");
 window.location.href="admin.html";
 })
 .catch(()=>{
