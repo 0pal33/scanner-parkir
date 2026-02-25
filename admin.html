@@ -38,6 +38,13 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
+// WIB DATE
+function getWIBDate(){
+let now = new Date();
+let wib = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
+return `${wib.getFullYear()}-${wib.getMonth()+1}-${wib.getDate()}`;
+}
+
 // ROLE EMAIL
 const ownerEmail = "afrupradana2@gmail.com";
 const editorEmail = "fakha3161@gmail.com";
@@ -70,7 +77,7 @@ document.getElementById("menu").innerHTML =
 // LOAD REPORT
 function loadReport(){
 
-let today = new Date().toISOString().split("T")[0];
+let today = getWIBDate();
 
 db.collection("checkout")
 .where("tanggal","==",today)
