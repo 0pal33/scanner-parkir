@@ -1,29 +1,65 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Scanner Parkir</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Wayahe Parkir</title>
+
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#000000">
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <style>
-body {margin:0;font-family:sans-serif;text-align:center;background:#f5f5f5;}
-button {width:90%;padding:20px;font-size:22px;margin:15px;border:none;border-radius:12px;}
+body {margin:0;background:#f5f5f5;font-family:sans-serif;text-align:center;}
+
+#reader {
+width:85%;
+margin:20px auto;
+border-radius:16px;
+overflow:hidden;
+}
+
+button {
+width:90%;
+padding:18px;
+font-size:20px;
+margin:10px;
+border:none;
+border-radius:12px;
+}
+
+.start {background:black;color:white;}
+.stop {background:red;color:white;}
 .green {background:green;color:white;}
 .red {background:red;color:white;}
 .blue {background:#007bff;color:white;}
+
+.switchCam {
+position:fixed;
+bottom:120px;
+right:20px;
+background:#444;
+color:white;
+width:60px;
+height:60px;
+border-radius:50%;
+font-size:20px;
+}
+
 </style>
 </head>
 
 <body>
 
-<h2>Scan QR Parkir</h2>
 <div id="reader"></div>
 <div id="result"></div>
 
+<button class="start" onclick="startScan()">START SCANNING</button>
+<button class="stop" onclick="stopScan()">STOP SCANNING</button>
 <button class="blue" onclick="manualInput()">Ketik Manual</button>
+<button class="switchCam" onclick="switchCamera()">🔄</button>
 
 <script>
 
@@ -39,163 +75,116 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// VALIDASI QR
-function validQR(qr){
-  return /^Parkir-\d{3}$/.test(qr);
-}
+let html5QrCode;
+let currentCamera = "environment";
 
-// WIB SEKARANG
+// WIB
 function getWIB(){
-
-  let now = new Date();
-  let wib = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
-
-  return {
-    date: `${wib.getFullYear()}-${wib.getMonth()+1}-${wib.getDate()}`,
-    hour: wib.getHours(),
-    time: wib.toLocaleString("id-ID")
-  };
+let now = new Date();
+let wib = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
+return {
+date: `${wib.getFullYear()}-${wib.getMonth()+1}-${wib.getDate()}`,
+hour: wib.getHours(),
+time: wib.toLocaleString("id-ID")
+};
 }
 
-// ===== AUTO KONVERSI DATA LAMA =====
-function normalizeData(data){
-
-  // DATA BARU
-  if(data.tanggal){
-    return data;
-  }
-
-  // DATA LAMA (timestamp)
-  if(data.checkin){
-
-    let masuk = data.checkin.toDate();
-    let wib = new Date(masuk.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
-
-    return {
-      tanggal: `${wib.getFullYear()}-${wib.getMonth()+1}-${wib.getDate()}`,
-      jam: wib.getHours(),
-      waktu: wib.toLocaleString("id-ID")
-    }
-  }
-
-  return null;
+// VALID QR
+function validQR(qr){
+return /^Parkir-\d{3}$/.test(qr);
 }
 
 // HITUNG HARI
 function hitungHari(data){
+let now = getWIB();
+let t1 = new Date(data.tanggal);
+let t2 = new Date(now.date);
+let beda = Math.round((t2-t1)/(1000*60*60*24));
 
-  let now = getWIB();
-
-  let t1 = new Date(data.tanggal);
-  let t2 = new Date(now.date);
-
-  let bedaTanggal = Math.round((t2-t1)/(1000*60*60*24));
-
-  if(bedaTanggal == 0) return 1;
-
-  if(bedaTanggal == 1){
-    if(data.jam >= 21 && now.hour <= 6) return 1;
-    return 2;
-  }
-
-  return bedaTanggal + 1;
+if(beda==0) return 1;
+if(beda==1){
+if(data.jam>=21 && now.hour<=6) return 1;
+return 2;
 }
-
-// UI
-function tampilKosong(qr){
-  document.getElementById("result").innerHTML =
-  `<h3>${qr}</h3>
-   <p>Status: KOSONG</p>
-   <button class="green" onclick="checkIn('${qr}')">CHECK-IN</button>`;
-}
-
-function tampilAktif(qr,data){
-
-  let hari = hitungHari(data);
-  let total = hari * 3000;
-  let rupiah = total.toLocaleString("id-ID");
-
-  document.getElementById("result").innerHTML =
-  `<h3>${qr}</h3>
-   <p>Status: AKTIF</p>
-   <p>Masuk: ${data.waktu}</p>
-   <p>Lama: ${hari} hari</p>
-   <p>Tagihan: Rp ${rupiah}</p>
-   <button class="red" onclick="checkOut('${qr}')">CHECK-OUT</button>`;
+return beda+1;
 }
 
 // SCAN
 function onScanSuccess(qr){
 
-  if(!validQR(qr)){
-    document.getElementById("result").innerHTML = "<p>QR tidak valid</p>";
-    return;
-  }
+if(!validQR(qr)){
+document.getElementById("result").innerHTML = "<p>QR tidak valid</p>";
+return;
+}
 
-  let docRef = db.collection("parkir").doc(qr);
+let ref = db.collection("parkir").doc(qr);
 
-  docRef.get().then((doc)=>{
-
-    if(!doc.exists){
-      tampilKosong(qr);
-      return;
-    }
-
-    let data = normalizeData(doc.data());
-
-    if(!data){
-      tampilKosong(qr);
-      return;
-    }
-
-    tampilAktif(qr,data);
-  });
+ref.get().then(doc=>{
+if(!doc.exists){
+document.getElementById("result").innerHTML =
+`<h3>${qr}</h3>
+<button class="green" onclick="checkIn('${qr}')">CHECK-IN</button>`;
+}else{
+let data = doc.data();
+let hari = hitungHari(data);
+let total = hari*3000;
+document.getElementById("result").innerHTML =
+`<h3>${qr}</h3>
+<p>Masuk: ${data.waktu}</p>
+<p>Lama: ${hari} hari</p>
+<p>Tagihan: Rp ${total.toLocaleString("id-ID")}</p>
+<button class="red" onclick="checkOut('${qr}')">CHECKOUT SEKARANG</button>`;
+}
+});
 }
 
 // CHECKIN
 function checkIn(qr){
-
-  let now = getWIB();
-
-  db.collection("parkir").doc(qr).set({
-    tanggal: now.date,
-    jam: now.hour,
-    waktu: now.time
-  });
-
-  tampilAktif(qr,{
-    tanggal: now.date,
-    jam: now.hour,
-    waktu: now.time
-  });
+let now=getWIB();
+db.collection("parkir").doc(qr).set({
+tanggal: now.date,
+jam: now.hour,
+waktu: now.time
+});
 }
 
 // CHECKOUT
 function checkOut(qr){
-  let konfirmasi = confirm("Motor keluar?");
-  if(!konfirmasi) return;
-  db.collection("parkir").doc(qr).delete();
-  tampilKosong(qr);
+if(!confirm("Motor keluar?")) return;
+db.collection("parkir").doc(qr).delete();
+document.getElementById("result").innerHTML="";
 }
 
 // MANUAL
 function manualInput(){
-
-  let angka = prompt("Masukkan angka parkir (contoh: 123)");
-  if(!angka) return;
-
-  if(!/^\d{3}$/.test(angka)){
-    alert("Harus 3 digit");
-    return;
-  }
-
-  let qr = "Parkir-" + angka;
-  onScanSuccess(qr);
+let angka=prompt("Masukkan angka parkir");
+if(!/^\d{3}$/.test(angka)) return alert("Harus 3 digit");
+onScanSuccess("Parkir-"+angka);
 }
 
-// SCANNER
-let scanner = new Html5QrcodeScanner("reader",{fps:10,qrbox:300});
-scanner.render(onScanSuccess);
+// START
+function startScan(){
+html5QrCode=new Html5Qrcode("reader");
+html5QrCode.start(
+{ facingMode: currentCamera },
+{ fps:10, qrbox:250 },
+onScanSuccess
+);
+}
+
+// STOP
+function stopScan(){
+if(html5QrCode){
+html5QrCode.stop();
+}
+}
+
+// SWITCH
+function switchCamera(){
+currentCamera = currentCamera=="environment"?"user":"environment";
+stopScan();
+startScan();
+}
 
 </script>
 
