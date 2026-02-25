@@ -6,12 +6,18 @@
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 </head>
 
 <body style="text-align:center;font-family:sans-serif">
 
 <h2>Dashboard Admin</h2>
+
+<p id="role"></p>
+
+<div id="menu"></div>
+
 <button onclick="logout()">Logout</button>
 
 <script>
@@ -26,12 +32,52 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// ROLE EMAIL
+const ownerEmail = "afrupradana2@gmail.com";
+const editorEmail = "fakha3161@gmail.com";
 
 firebase.auth().onAuthStateChanged(user=>{
 if(!user){
 window.location.href="/";
+return;
 }
+
+let role = "viewer";
+
+if(user.email == ownerEmail){
+role = "owner";
+}
+
+if(user.email == editorEmail){
+role = "editor";
+}
+
+document.getElementById("role").innerHTML = "Role: " + role;
+
+if(role == "owner"){
+document.getElementById("menu").innerHTML =
+`<p>Anda pemilik sistem</p>
+<button onclick="editTarif()">Edit Tarif</button>`;
+}
+
+if(role == "editor"){
+document.getElementById("menu").innerHTML =
+`<p>Anda editor</p>
+<button onclick="editTarif()">Edit Tarif</button>`;
+}
+
+if(role == "viewer"){
+document.getElementById("menu").innerHTML =
+`<p>Akses hanya melihat</p>`;
+}
+
 });
+
+function editTarif(){
+alert("Fitur edit tarif akan dibuat selanjutnya");
+}
 
 function logout(){
 firebase.auth().signOut();
