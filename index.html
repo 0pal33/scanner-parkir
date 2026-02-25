@@ -4,29 +4,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Wayahe Parkir</title>
 
-<link rel="manifest" href="manifest.json">
-
 <script src="https://unpkg.com/html5-qrcode"></script>
 
-<!-- FIREBASE COMPAT -->
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 
 <style>
-body {
- text-align:center;
- font-family: Arial;
- background:#f5f5f5;
- margin:0;
- padding:20px;
-}
+body { text-align:center; font-family:Arial; background:#f5f5f5; margin:0; padding:20px; }
 
-#reader {
- width:260px;
- margin:auto;
- border-radius:20px;
- overflow:hidden;
-}
+#reader { width:260px; margin:auto; border-radius:20px; overflow:hidden; }
 
 button {
  width:90%;
@@ -37,12 +23,13 @@ button {
  font-size:18px;
 }
 
-.start { background:black; color:white; }
-.stop { background:red; color:white; }
-.checkin { background:green; color:white; }
-.checkout { background:red; color:white; }
-.manual { background:#2d77c7; color:white; }
-.admin { background:#555; color:white; }
+.start{background:black;color:white;}
+.stop{background:red;color:white;}
+.checkin{background:green;color:white;}
+.checkout{background:red;color:white;}
+.cancel{background:orange;color:white;}
+.manual{background:#2d77c7;color:white;}
+.admin{background:#555;color:white;}
 </style>
 </head>
 
@@ -53,110 +40,142 @@ button {
 <button id="startBtn" class="start" onclick="startScan()">START SCANNING</button>
 <button id="stopBtn" class="stop" onclick="stopScan()" style="display:none;">STOP SCANNING</button>
 
-<div id="result"></div>
+<div id="info"></div>
 
 <button id="checkinBtn" class="checkin" style="display:none;" onclick="checkin()">CHECK-IN</button>
 <button id="checkoutBtn" class="checkout" style="display:none;" onclick="checkout()">CHECKOUT SEKARANG</button>
+<button id="cancelBtn" class="cancel" style="display:none;" onclick="cancel()">BATALKAN PARKIR</button>
 
 <button class="manual" onclick="manualInput()">Ketik Manual</button>
 <button class="admin" onclick="location.href='admin.html'">Login Admin</button>
 
 <script>
 
-// ==== FIREBASE CONFIG ====
 const firebaseConfig = {
   apiKey: "AIzaSyCbB2eqYAxCM1DvkSyCyoqKwq39mvCBwCQ",
   authDomain: "parkir-demo.firebaseapp.com",
-  projectId: "parkir-demo"
+  projectId: "parkir-demo",
+  storageBucket: "parkir-demo.firebasestorage.app",
+  messagingSenderId: "962001897575",
+  appId: "1:962001897575:web:811c1902e3a274f7bb6cc2"
 };
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-// ==== SCANNER ====
 let html5QrCode;
 let lastQR = null;
 
+// WIB time
+function nowWIB(){
+ let d = new Date();
+ return new Date(d.toLocaleString("en-US",{timeZone:"Asia/Jakarta"}));
+}
+
+// hitung hari
+function hitungHari(masuk){
+ let now = nowWIB();
+ let m = new Date(masuk);
+
+ let diff = Math.ceil((now - m)/(1000*60*60*24));
+ if(diff<1) diff=1;
+
+ // special rule
+ let jamMasuk = m.getHours();
+ let jamNow = now.getHours();
+
+ if(jamMasuk>=21 && jamMasuk<=23){
+   let bedaHari = now.getDate() - m.getDate();
+   if(bedaHari==1 && jamNow<=6) diff=1;
+ }
+
+ return diff;
+}
+
+// scan
 async function startScan(){
  html5QrCode = new Html5Qrcode("reader");
-
  const devices = await Html5Qrcode.getCameras();
  const back = devices.find(d => d.label.toLowerCase().includes("back")) || devices[0];
 
- html5QrCode.start(
-   back.id,
-   { fps:10, qrbox:200 },
-   qr => {
-     if(!qr.startsWith("Parkir-")) return;
+ html5QrCode.start(back.id,{fps:10,qrbox:200},handleQR);
 
-     lastQR = qr;
-     document.getElementById("result").innerHTML = qr;
-
-     document.getElementById("checkinBtn").style.display="block";
-     document.getElementById("checkoutBtn").style.display="block";
-   }
- );
-
- document.getElementById("startBtn").style.display="none";
- document.getElementById("stopBtn").style.display="block";
+ startBtn.style.display="none";
+ stopBtn.style.display="block";
 }
 
 function stopScan(){
- if(html5QrCode) html5QrCode.stop();
-
- document.getElementById("startBtn").style.display="block";
- document.getElementById("stopBtn").style.display="none";
+ html5QrCode.stop();
+ startBtn.style.display="block";
+ stopBtn.style.display="none";
 }
 
-// ==== MANUAL ====
+// handle scan
+async function handleQR(qr){
+ if(!qr.startsWith("Parkir-")) return;
+ lastQR=qr;
+
+ let doc = await db.collection("parkir").doc(qr).get();
+
+ if(!doc.exists){
+   info.innerHTML="Belum aktif";
+   checkinBtn.style.display="block";
+   checkoutBtn.style.display="none";
+   cancelBtn.style.display="none";
+ }
+ else{
+   let masuk = doc.data().masuk;
+   let hari = hitungHari(masuk);
+   let tarif = hari * 3000;
+
+   info.innerHTML=
+   "Masuk: "+ new Date(masuk).toLocaleString()+
+   "<br>Lama: "+hari+" hari"+
+   "<br>Tagihan: Rp "+tarif;
+
+   checkinBtn.style.display="none";
+   checkoutBtn.style.display="block";
+   cancelBtn.style.display="block";
+ }
+}
+
+// manual
 function manualInput(){
- let num = prompt("Masukkan angka parkir:");
+ let num=prompt("Masukkan nomor:");
  if(!num) return;
-
- lastQR = "Parkir-"+num;
- document.getElementById("result").innerHTML = lastQR;
-
- document.getElementById("checkinBtn").style.display="block";
- document.getElementById("checkoutBtn").style.display="block";
+ handleQR("Parkir-"+num);
 }
 
-// ==== CHECKIN ====
+// checkin
 async function checkin(){
- if(!lastQR) return;
-
  await db.collection("parkir").doc(lastQR).set({
-   masuk: new Date().toISOString(),
-   status:"aktif"
+   masuk: nowWIB().toISOString()
  });
-
- alert("Check-in sukses");
+ alert("Checkin sukses");
 }
 
-// ==== CHECKOUT ====
+// checkout
 async function checkout(){
- if(!lastQR) return;
-
- const ref = db.collection("parkir").doc(lastQR);
- const snap = await ref.get();
-
- if(!snap.exists) return alert("Belum checkin");
+ let doc = await db.collection("parkir").doc(lastQR).get();
+ let hari = hitungHari(doc.data().masuk);
 
  await db.collection("checkout").add({
    qr:lastQR,
-   waktu:new Date().toLocaleString()
+   hari:hari,
+   bayar:hari*3000,
+   waktu: nowWIB().toISOString()
  });
 
- await ref.delete();
-
+ await db.collection("parkir").doc(lastQR).delete();
  alert("Checkout sukses");
 }
 
-// ==== PWA ====
-if('serviceWorker' in navigator){
- navigator.serviceWorker.register('sw.js');
+// batal
+async function cancel(){
+ await db.collection("parkir").doc(lastQR).delete();
+ alert("Parkir dibatalkan");
 }
 
 </script>
-
 </body>
 </html>
