@@ -2,58 +2,108 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin Wayahe Parkir</title>
+
+<title>Dashboard Admin</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 
 <style>
-body { font-family:Arial; text-align:center; background:#f5f5f5; padding:20px;}
-input { width:90%; padding:14px; margin:10px; border-radius:10px; border:1px solid #ccc;}
-button { width:90%; padding:14px; margin:10px; border:none; border-radius:12px; font-size:16px;}
-.login{background:black;color:white;}
-.logout{background:red;color:white;}
-.edit{background:orange;color:white;}
-.box{background:white;padding:15px;margin:10px;border-radius:12px;}
+body{
+font-family:Arial;
+background:#eee;
+margin:0;
+padding:20px;
+text-align:center;
+}
+
+.card{
+background:white;
+padding:20px;
+border-radius:16px;
+margin-top:15px;
+}
+
+button{
+width:100%;
+padding:16px;
+margin:8px 0;
+border:none;
+border-radius:12px;
+font-size:16px;
+color:white;
+}
+
+.logout{background:red;}
+.back{background:gray;}
+.active{background:#2ecc71;}
+.old{background:#3498db;}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:15px;
+}
+
+td,th{
+border:1px solid #ccc;
+padding:10px;
+}
 </style>
 </head>
 
 <body>
 
 <h2>Dashboard Admin</h2>
+<div id="role"></div>
 
-<div id="loginBox">
-<input id="email" placeholder="Email">
-<input id="password" type="password" placeholder="Password">
-<button class="login" onclick="login()">LOGIN</button>
-</div>
+<div class="card">
+<h3>Laporan</h3>
 
-<div id="dashboard" style="display:none;">
+<table>
+<tr>
+<th>Periode</th>
+<th>Checkout</th>
+<th>Total</th>
+</tr>
 
-<h3 id="roleText"></h3>
+<tr>
+<td>Hari Ini</td>
+<td id="hariCount">0</td>
+<td id="hariTotal">Rp 0</td>
+</tr>
 
-<div class="box">
-<h3>Hari Ini</h3>
-Checkout: <span id="hariCount">0</span><br>
-Total: Rp <span id="hariTotal">0</span>
-</div>
+<tr>
+<td>Minggu Ini</td>
+<td id="mingguCount">0</td>
+<td id="mingguTotal">Rp 0</td>
+</tr>
 
-<div class="box">
-<h3>Minggu Ini</h3>
-Checkout: <span id="mingguCount">0</span><br>
-Total: Rp <span id="mingguTotal">0</span>
-</div>
+<tr>
+<td>Bulan Ini</td>
+<td id="bulanCount">0</td>
+<td id="bulanTotal">Rp 0</td>
+</tr>
 
-<div class="box">
-<h3>Bulan Ini</h3>
-Checkout: <span id="bulanCount">0</span><br>
-Total: Rp <span id="bulanTotal">0</span>
-</div>
+</table>
 
-<button class="edit" onclick="editTarif()">Edit Tarif</button>
+<button class="active" onclick="lihatAktif()">Parkir Aktif</button>
+<button class="old" onclick="lihatLama()">Laporan Sebelumnya</button>
 <button class="logout" onclick="logout()">Logout</button>
 
+</div>
+
+<div class="card" id="aktifBox" style="display:none">
+<h3>Parkir Aktif</h3>
+<div id="aktifList"></div>
+<button class="back" onclick="kembali()">Kembali</button>
+</div>
+
+<div class="card" id="lamaBox" style="display:none">
+<h3>Laporan Sebelumnya</h3>
+<div id="lamaList"></div>
+<button class="back" onclick="kembali()">Kembali</button>
 </div>
 
 <script>
@@ -68,114 +118,131 @@ const firebaseConfig = {
 };
 
 firebase.initializeApp(firebaseConfig);
-const auth = firebase.auth();
 const db = firebase.firestore();
+const auth = firebase.auth();
 
-function parseTanggal(str){
-
- if(str.includes("/")){
-   let p = str.split("/");
-   return new Date(p[2],p[1]-1,p[0]);
- }
-
- if(str.includes("-")){
-   let p = str.split("-");
-   return new Date(p[0],p[1]-1,p[2]);
- }
-
- return new Date(str);
+function logout(){
+auth.signOut().then(()=>location.href="index.html");
 }
 
-async function login(){
- let email=document.getElementById("email").value;
- let pass=document.getElementById("password").value;
- await auth.signInWithEmailAndPassword(email,pass);
+function kembali(){
+aktifBox.style.display="none";
+lamaBox.style.display="none";
+}
+
+function lihatAktif(){
+aktifBox.style.display="block";
+lamaBox.style.display="none";
+loadAktif();
+}
+
+function lihatLama(){
+lamaBox.style.display="block";
+aktifBox.style.display="none";
+loadLama();
 }
 
 auth.onAuthStateChanged(async user=>{
- if(user){
 
-   let roleDoc = await db.collection("roles").doc(user.email).get();
-
-   if(roleDoc.exists){
-     document.getElementById("loginBox").style.display="none";
-     document.getElementById("dashboard").style.display="block";
-     document.getElementById("roleText").innerHTML="Role: "+roleDoc.data().role;
-     loadLaporan();
-   }
-
- } else {
-   document.getElementById("loginBox").style.display="block";
-   document.getElementById("dashboard").style.display="none";
- }
-});
-
-function logout(){
- auth.signOut();
+if(!user){
+location.href="index.html";
+return;
 }
+
+let roleDoc = await db.collection("roles").doc(user.email).get();
+
+if(!roleDoc.exists){
+alert("Bukan admin");
+logout();
+return;
+}
+
+document.getElementById("role").innerHTML="Role: "+roleDoc.data().role;
+
+loadLaporan();
+
+});
 
 async function loadLaporan(){
 
- let snapshot = await db.collection("checkout").get();
+let now = new Date();
 
- let today = new Date();
- today.setHours(0,0,0,0);
+let todayStart = new Date(now.getFullYear(),now.getMonth(),now.getDate());
+let weekStart = new Date(todayStart);
+weekStart.setDate(todayStart.getDate() - todayStart.getDay() + 1);
 
- let minggu = new Date();
- minggu.setDate(today.getDate()-7);
+let monthStart = new Date(now.getFullYear(),now.getMonth(),1);
 
- let bulan = new Date();
- bulan.setMonth(today.getMonth()-1);
+let snap = await db.collection("checkout").get();
 
- let hariCount=0, hariTotal=0;
- let mingguCount=0, mingguTotal=0;
- let bulanCount=0, bulanTotal=0;
+let hariC=0, mingguC=0, bulanC=0;
+let hariT=0, mingguT=0, bulanT=0;
 
- snapshot.forEach(doc=>{
-   let data = doc.data();
-   if(!data.tanggal) return;
+snap.forEach(doc=>{
+let data=doc.data();
+let waktu = new Date(data.waktu);
 
-   let tgl = parseTanggal(data.tanggal);
-   tgl.setHours(0,0,0,0);
+if(waktu>=todayStart){
+hariC++;
+hariT+=data.bayar;
+}
 
-   if(tgl.getTime() === today.getTime()){
-     hariCount++;
-     hariTotal+=data.bayar;
-   }
+if(waktu>=weekStart){
+mingguC++;
+mingguT+=data.bayar;
+}
 
-   if(tgl>=minggu){
-     mingguCount++;
-     mingguTotal+=data.bayar;
-   }
+if(waktu>=monthStart){
+bulanC++;
+bulanT+=data.bayar;
+}
 
-   if(tgl>=bulan){
-     bulanCount++;
-     bulanTotal+=data.bayar;
-   }
- });
+});
 
- document.getElementById("hariCount").innerText=hariCount;
- document.getElementById("hariTotal").innerText=hariTotal;
+hariCount.innerText=hariC;
+mingguCount.innerText=mingguC;
+bulanCount.innerText=bulanC;
 
- document.getElementById("mingguCount").innerText=mingguCount;
- document.getElementById("mingguTotal").innerText=mingguTotal;
-
- document.getElementById("bulanCount").innerText=bulanCount;
- document.getElementById("bulanTotal").innerText=bulanTotal;
+hariTotal.innerText="Rp "+hariT;
+mingguTotal.innerText="Rp "+mingguT;
+bulanTotal.innerText="Rp "+bulanT;
 
 }
 
-async function editTarif(){
+async function loadAktif(){
 
- let baru = prompt("Masukkan tarif baru per hari");
+aktifList.innerHTML="Loading...";
 
- if(!baru) return;
+let snap = await db.collection("parkir").get();
 
- await db.collection("config").doc("tarif").set({
-   perHari:Number(baru)
- });
+let html="";
 
- alert("Tarif berhasil diubah");
+snap.forEach(doc=>{
+let d=doc.data();
+if(d.status=="on"){
+let masuk = d.checkinAt.toDate();
+let now=new Date();
+let hari=Math.ceil((now-masuk)/(1000*60*60*24));
+if(hari<1)hari=1;
+
+html+=`
+<div>
+${doc.id}<br>
+Masuk: ${masuk.toLocaleString("id-ID")}<br>
+Durasi: ${hari} hari
+<hr>
+</div>
+`;
+}
+});
+
+aktifList.innerHTML=html||"Tidak ada parkir aktif";
+
+}
+
+async function loadLama(){
+
+lamaList.innerHTML="Max 3 bulan terakhir";
 
 }
 
