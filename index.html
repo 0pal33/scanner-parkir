@@ -1,9 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <link rel="manifest" href="manifest.json">
+
+<title>Scanner Parkir</title>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 
@@ -32,43 +34,57 @@ display:block;
 }
 
 #startBtn{background:black;}
-#stopBtn{background:red;display:none;}
-#checkinBtn{background:green;display:none;}
-#checkoutBtn{background:red;display:none;}
-#cancelBtn{background:orange;display:none;}
-#manualBtn{background:#2c74b3;}
-#loginBtn{background:#666;}
+#stopBtn{background:red; display:none;}
+#checkinBtn{background:green; display:none;}
+#checkoutBtn{background:red; display:none;}
+#cancelBtn{background:orange; display:none;}
+#manualBtn{background:#2d73b9;}
+#adminBtn{background:gray;}
 
 #reader{
-width:300px;
+width:85%;
 margin:auto;
-border-radius:20px;
-overflow:hidden;
 display:none;
 }
 
-#result{margin-top:10px;font-size:18px;}
-</style>
+#manualBox{
+display:none;
+margin:10px;
+}
 
+input{
+padding:15px;
+font-size:18px;
+width:150px;
+text-align:center;
+}
+
+</style>
 </head>
+
 <body>
 
+<button id="startBtn">START SCANNING</button>
 <div id="reader"></div>
+<button id="stopBtn">STOP SCANNING</button>
 
-<button id="startBtn" onclick="startScan()">START SCANNING</button>
-<button id="stopBtn" onclick="stopScan()">STOP SCANNING</button>
+<div id="info"></div>
 
-<div id="result"></div>
+<button id="checkinBtn">CHECK-IN</button>
+<button id="checkoutBtn">CHECKOUT SEKARANG</button>
+<button id="cancelBtn">BATALKAN PARKIR</button>
 
-<button id="checkinBtn" onclick="checkin()">CHECK-IN</button>
-<button id="checkoutBtn" onclick="checkout()">CHECKOUT SEKARANG</button>
-<button id="cancelBtn" onclick="cancelParkir()">BATALKAN PARKIR</button>
+<button id="manualBtn">Ketik Manual</button>
 
-<button id="manualBtn" onclick="manualInput()">Ketik Manual</button>
-<button id="loginBtn" onclick="location.href='admin.html'">Login Admin</button>
+<div id="manualBox">
+Parkir- <input id="manualInput" maxlength="3">
+<button onclick="manualOk()">✓</button>
+<button onclick="manualCancel()">✕</button>
+</div>
+
+<button id="adminBtn" onclick="location.href='admin.html'">Login Admin</button>
 
 <script>
-
 const firebaseConfig = {
   apiKey: "AIzaSyCbB2eqYAxCM1DvkSyCyoqKwq39mvCBwCQ",
   authDomain: "parkir-demo.firebaseapp.com",
@@ -81,121 +97,81 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-let qrCode="";
 let html5QrCode;
-let camId;
+let activeQR = "";
 
-async function startScan(){
+document.getElementById("startBtn").onclick = async ()=>{
 html5QrCode = new Html5Qrcode("reader");
-let devices = await Html5Qrcode.getCameras();
-camId = devices.find(d=>d.label.toLowerCase().includes("back"))?.id || devices[0].id;
-
 document.getElementById("reader").style.display="block";
 document.getElementById("startBtn").style.display="none";
 document.getElementById("stopBtn").style.display="block";
 
-html5QrCode.start(
-camId,
-{fps:10,qrbox:250},
-msg=>{
-qrCode=msg;
-loadData();
+await html5QrCode.start(
+{ facingMode: "environment" },
+{ fps: 10, qrbox: 250 },
+qr=>{
+if(!qr.startsWith("Parkir-")) return;
+activeQR = qr;
+loadData(qr);
 }
 );
-}
+};
 
-function stopScan(){
-html5QrCode.stop();
+document.getElementById("stopBtn").onclick = async ()=>{
+await html5QrCode.stop();
 document.getElementById("reader").style.display="none";
 document.getElementById("startBtn").style.display="block";
 document.getElementById("stopBtn").style.display="none";
-}
+};
 
-async function loadData(){
-let ref = db.collection("parkir").doc(qrCode);
-let snap = await ref.get();
-
-if(!snap.exists){
-showCheckin();
+function loadData(qr){
+db.collection("parkir").doc(qr).get().then(doc=>{
+if(!doc.exists){
+document.getElementById("checkinBtn").style.display="block";
 return;
 }
-
-let data=snap.data();
-
-if(data.status==="on"){
-let now=new Date();
-let masuk=data.checkinAt.toDate();
-
-let diff=Math.floor((now-masuk)/(1000*60*60*24))+1;
-let tarif=diff*3000;
-
-document.getElementById("result").innerHTML=
-`
-<b>${qrCode}</b><br>
-Masuk: ${masuk.toLocaleString('id-ID')}<br>
-Lama: ${diff} hari<br>
-Tagihan: Rp ${tarif}
-`;
-
+let data = doc.data();
+if(data.status=="on"){
 document.getElementById("checkoutBtn").style.display="block";
 document.getElementById("cancelBtn").style.display="block";
-}else{
-showCheckin();
 }
-}
-
-function showCheckin(){
-document.getElementById("result").innerHTML="QR siap digunakan";
-document.getElementById("checkinBtn").style.display="block";
+});
 }
 
-async function checkin(){
-await db.collection("parkir").doc(qrCode).set({
+document.getElementById("checkinBtn").onclick = ()=>{
+db.collection("parkir").doc(activeQR).set({
 status:"on",
-checkinAt: new Date()
+checkinAt: firebase.firestore.Timestamp.now()
 });
-loadData();
-}
+};
 
-async function checkout(){
-let ref=db.collection("parkir").doc(qrCode);
-let snap=await ref.get();
-let data=snap.data();
-
-let masuk=data.checkinAt.toDate();
-let now=new Date();
-
-let diff=Math.floor((now-masuk)/(1000*60*60*24))+1;
-let total=diff*3000;
-
-await db.collection("checkout").add({
-qr:qrCode,
-checkin:masuk,
-checkout:now,
-total:total
+document.getElementById("checkoutBtn").onclick = ()=>{
+db.collection("checkout").add({
+qr: activeQR,
+bayar:3000,
+checkoutAt: firebase.firestore.Timestamp.now()
 });
+db.collection("parkir").doc(activeQR).delete();
+};
 
-await ref.update({status:"off"});
-alert("Checkout berhasil");
-location.reload();
+document.getElementById("cancelBtn").onclick = ()=>{
+db.collection("parkir").doc(activeQR).delete();
+};
+
+document.getElementById("manualBtn").onclick = ()=>{
+document.getElementById("manualBox").style.display="block";
+};
+
+function manualOk(){
+let val=document.getElementById("manualInput").value;
+activeQR="Parkir-"+val;
+loadData(activeQR);
+document.getElementById("manualBox").style.display="none";
 }
 
-async function cancelParkir(){
-await db.collection("parkir").doc(qrCode).update({
-status:"off"
-});
-alert("Parkir dibatalkan");
-location.reload();
+function manualCancel(){
+document.getElementById("manualBox").style.display="none";
 }
-
-function manualInput(){
-let num=prompt("Masukkan 3 digit:");
-if(num){
-qrCode="Parkir-"+num.padStart(3,"0");
-loadData();
-}
-}
-
 </script>
 </body>
 </html>
