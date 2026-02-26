@@ -1,9 +1,8 @@
 {
 "name":"Scanner Parkir",
 "short_name":"Parkir",
-"start_url":"/index.html",
 "display":"standalone",
+"start_url":"index.html",
 "background_color":"#ffffff",
-"description":"Scanner Parkir",
-"icons":[]
+"theme_color":"#000000"
 }
