@@ -24,6 +24,22 @@ button{padding:12px;margin:10px}
 </div>
 
 <div id="dashboard" style="display:none">
+<div id="activePage" style="display:none;">
+<h2>Parkir Aktif</h2>
+
+<table border="1" width="100%">
+<tr>
+<th>QR</th>
+<th>Check-in</th>
+<th>Durasi</th>
+</tr>
+<tbody id="activeList"></tbody>
+</table>
+
+<button onclick="backDashboard()" style="margin-top:10px;">
+Kembali
+</button>
+</div>
 <h2>Dashboard</h2>
 <table border="1" align="center">
 <tr><th></th><th>Checkout</th><th>Total</th></tr>
@@ -31,6 +47,9 @@ button{padding:12px;margin:10px}
 <tr><td>Minggu Ini</td><td id="mC">0</td><td id="mT">0</td></tr>
 <tr><td>Bulan Ini</td><td id="bC">0</td><td id="bT">0</td></tr>
 </table>
+<button onclick="showActive()" style="background:#2196F3;margin-top:10px;">
+Parkir Aktif
+</button>
 <button onclick="logout()">Logout</button>
 </div>
 
@@ -77,6 +96,66 @@ c++; t+=data.bayar;
 document.getElementById("hC").innerText=c;
 document.getElementById("hT").innerText=t;
 });
+}
+function showActive(){
+
+document.getElementById("dashboard").style.display="none";
+document.getElementById("activePage").style.display="block";
+
+loadActive();
+
+}
+function backDashboard(){
+
+document.getElementById("activePage").style.display="none";
+document.getElementById("dashboard").style.display="block";
+
+}
+async function loadActive(){
+
+const snapshot = await db.collection("parkir")
+.where("status","==","on")
+.get();
+
+let html = "";
+
+snapshot.forEach(doc => {
+
+const data = doc.data();
+
+const checkin = data.checkinAt?.toDate();
+
+if(!checkin) return;
+
+const now = new Date();
+
+let days = Math.floor((now - checkin) / 86400000);
+
+// aturan malam
+const hour = checkin.getHours();
+
+if(hour >=21){
+const tomorrow = new Date(checkin);
+tomorrow.setDate(tomorrow.getDate()+1);
+tomorrow.setHours(0,0,0,0);
+
+if(now < tomorrow){
+days = 0;
+}
+}
+
+html += `
+<tr>
+<td>${doc.id}</td>
+<td>${checkin.toLocaleString("id-ID")}</td>
+<td>${days} hari</td>
+</tr>
+`;
+
+});
+
+document.getElementById("activeList").innerHTML = html;
+
 }
 </script>
 </body>
