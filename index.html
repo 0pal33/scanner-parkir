@@ -2,10 +2,9 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Scanner Parkir</title>
 
 <link rel="manifest" href="manifest.json">
-
-<title>Scanner Parkir</title>
 
 <script src="https://unpkg.com/html5-qrcode"></script>
 
@@ -14,72 +13,42 @@
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 
 <style>
-body{
-font-family:Arial;
-background:#eee;
-text-align:center;
-margin:0;
-padding:15px;
-}
-
-button{
-width:90%;
-padding:18px;
-margin:10px auto;
-border:none;
-border-radius:12px;
-font-size:18px;
-color:white;
-display:block;
-}
-
-#startBtn{background:black;}
-#stopBtn{background:red; display:none;}
-#checkinBtn{background:green; display:none;}
-#checkoutBtn{background:red; display:none;}
-#cancelBtn{background:orange; display:none;}
-#manualBtn{background:#2d73b9;}
-#adminBtn{background:gray;}
-
-#reader{
-width:85%;
-margin:auto;
-display:none;
-}
-
-#manualBox{
-display:none;
-margin:10px;
-}
-
-input{
-padding:15px;
-font-size:18px;
-width:150px;
-text-align:center;
-}
-
+body{font-family:Arial;background:#eee;text-align:center;margin:0;padding:15px}
+button{width:90%;padding:16px;margin:10px auto;border:none;border-radius:12px;font-size:18px;color:white;display:block}
+#startBtn{background:black}
+#stopBtn{background:red;display:none}
+#checkinBtn{background:green}
+#checkoutBtn{background:red}
+#cancelBtn{background:orange}
+#manualBtn{background:#2b6cb0}
+#adminBtn{background:gray}
+#reader{width:80%;margin:auto;display:none}
+#manualBox{display:none}
+input{padding:10px;font-size:16px;width:150px}
+.iconBtn{padding:10px;width:auto;margin-left:5px}
 </style>
 </head>
 
 <body>
 
-<button id="startBtn">START SCANNING</button>
 <div id="reader"></div>
+
+<button id="startBtn">START SCANNING</button>
 <button id="stopBtn">STOP SCANNING</button>
 
 <div id="info"></div>
 
-<button id="checkinBtn">CHECK-IN</button>
-<button id="checkoutBtn">CHECKOUT SEKARANG</button>
-<button id="cancelBtn">BATALKAN PARKIR</button>
+<button id="checkinBtn" style="display:none">CHECK-IN</button>
+<button id="checkoutBtn" style="display:none">CHECKOUT SEKARANG</button>
+<button id="cancelBtn" style="display:none">BATALKAN PARKIR</button>
 
 <button id="manualBtn">Ketik Manual</button>
 
 <div id="manualBox">
-Parkir- <input id="manualInput" maxlength="3">
-<button onclick="manualOk()">✓</button>
-<button onclick="manualCancel()">✕</button>
+Parkir-
+<input id="manualInput" maxlength="3" type="number">
+<button class="iconBtn" onclick="submitManual()">✓</button>
+<button class="iconBtn" onclick="cancelManual()">✕</button>
 </div>
 
 <button id="adminBtn" onclick="location.href='admin.html'">Login Admin</button>
@@ -97,80 +66,102 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
-let html5QrCode;
-let activeQR = "";
+let scanner;
+let currentQR = null;
 
-document.getElementById("startBtn").onclick = async ()=>{
-html5QrCode = new Html5Qrcode("reader");
+document.getElementById("startBtn").onclick = startScan;
+document.getElementById("stopBtn").onclick = stopScan;
+
+function startScan(){
 document.getElementById("reader").style.display="block";
 document.getElementById("startBtn").style.display="none";
 document.getElementById("stopBtn").style.display="block";
 
-await html5QrCode.start(
-{ facingMode: "environment" },
-{ fps: 10, qrbox: 250 },
+scanner = new Html5Qrcode("reader");
+scanner.start({ facingMode:"environment" }, { fps:10, qrbox:250 },
 qr=>{
-if(!qr.startsWith("Parkir-")) return;
-activeQR = qr;
-loadData(qr);
+handleQR(qr);
+});
 }
-);
-};
 
-document.getElementById("stopBtn").onclick = async ()=>{
-await html5QrCode.stop();
+function stopScan(){
+scanner.stop();
 document.getElementById("reader").style.display="none";
 document.getElementById("startBtn").style.display="block";
 document.getElementById("stopBtn").style.display="none";
-};
-
-function loadData(qr){
-db.collection("parkir").doc(qr).get().then(doc=>{
-if(!doc.exists){
-document.getElementById("checkinBtn").style.display="block";
-return;
 }
-let data = doc.data();
-if(data.status=="on"){
+
+function handleQR(qr){
+if(!qr.startsWith("Parkir-")) return;
+currentQR = qr;
+
+db.collection("parkir").doc(qr).get().then(doc=>{
+if(!doc.exists || doc.data().status!="on"){
+showCheckin();
+}else{
+showActive(doc.data().checkinAt.toDate());
+}
+});
+}
+
+function showCheckin(){
+document.getElementById("info").innerHTML="Belum aktif";
+document.getElementById("checkinBtn").style.display="block";
+document.getElementById("checkoutBtn").style.display="none";
+document.getElementById("cancelBtn").style.display="none";
+}
+
+function showActive(date){
+let now = new Date();
+let durasi = Math.ceil((now-date)/(1000*60*60*24));
+let tarif = durasi*3000;
+
+document.getElementById("info").innerHTML=
+"Masuk: "+date.toLocaleString('id-ID')+
+"<br>Lama: "+durasi+" hari"+
+"<br>Tagihan: Rp "+tarif;
+
+document.getElementById("checkinBtn").style.display="none";
 document.getElementById("checkoutBtn").style.display="block";
 document.getElementById("cancelBtn").style.display="block";
 }
-});
-}
 
 document.getElementById("checkinBtn").onclick = ()=>{
-db.collection("parkir").doc(activeQR).set({
+db.collection("parkir").doc(currentQR).set({
 status:"on",
 checkinAt: firebase.firestore.Timestamp.now()
 });
+alert("Check-in sukses");
 };
 
 document.getElementById("checkoutBtn").onclick = ()=>{
 db.collection("checkout").add({
-qr: activeQR,
+qr:currentQR,
 bayar:3000,
 checkoutAt: firebase.firestore.Timestamp.now()
 });
-db.collection("parkir").doc(activeQR).delete();
+db.collection("parkir").doc(currentQR).delete();
+alert("Checkout sukses");
 };
 
 document.getElementById("cancelBtn").onclick = ()=>{
-db.collection("parkir").doc(activeQR).delete();
+db.collection("parkir").doc(currentQR).delete();
+alert("Dibatalkan");
 };
 
 document.getElementById("manualBtn").onclick = ()=>{
 document.getElementById("manualBox").style.display="block";
+document.getElementById("manualBtn").style.display="none";
 };
 
-function manualOk(){
-let val=document.getElementById("manualInput").value;
-activeQR="Parkir-"+val;
-loadData(activeQR);
-document.getElementById("manualBox").style.display="none";
+function submitManual(){
+handleQR("Parkir-"+document.getElementById("manualInput").value);
+cancelManual();
 }
 
-function manualCancel(){
+function cancelManual(){
 document.getElementById("manualBox").style.display="none";
+document.getElementById("manualBtn").style.display="block";
 }
 </script>
 </body>
