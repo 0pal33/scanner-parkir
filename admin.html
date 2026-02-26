@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<title>Dashboard</title>
+<title>Admin</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
@@ -19,16 +18,11 @@ margin:0;
 padding:15px;
 }
 
-table{
-width:100%;
-border-collapse:collapse;
-margin-top:20px;
-background:white;
-}
-
-td,th{
-border:1px solid #ccc;
+input{
 padding:12px;
+margin:10px;
+width:80%;
+font-size:16px;
 }
 
 button{
@@ -41,24 +35,45 @@ font-size:16px;
 color:white;
 }
 
+.login{background:black;}
+.cancel{background:grey;}
 .logout{
 position:fixed;
 top:10px;
 right:10px;
 background:red;
 }
+.active{background:orange;}
+.back{background:black;}
 
-.back{
-background:black;
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:20px;
+background:white;
 }
 
-.active{
-background:orange;
+td,th{
+border:1px solid #ccc;
+padding:12px;
 }
 </style>
 </head>
 
 <body>
+
+<!-- LOGIN PAGE -->
+<div id="loginPage">
+<h2>Login Admin</h2>
+<input type="email" id="email" placeholder="Email"><br>
+<input type="password" id="password" placeholder="Password"><br>
+
+<button class="login" onclick="login()">Login</button>
+<button class="cancel" onclick="location.href='index.html'">Batal</button>
+</div>
+
+<!-- DASHBOARD -->
+<div id="dashboard" style="display:none">
 
 <button class="logout" onclick="logout()">Logout</button>
 
@@ -94,6 +109,8 @@ background:orange;
 
 <div id="activeList"></div>
 
+</div>
+
 <script>
 const firebaseConfig = {
   apiKey: "AIzaSyCbB2eqYAxCM1DvkSyCyoqKwq39mvCBwCQ",
@@ -111,13 +128,34 @@ const auth = firebase.auth();
 
 <script>
 
-function logout(){
-auth.signOut().then(()=>{
-location.href="index.html";
+// AUTH CHECK
+auth.onAuthStateChanged(user=>{
+if(user){
+document.getElementById("loginPage").style.display="none";
+document.getElementById("dashboard").style.display="block";
+}else{
+document.getElementById("loginPage").style.display="block";
+document.getElementById("dashboard").style.display="none";
+}
 });
+
+// LOGIN
+function login(){
+let email = document.getElementById("email").value;
+let pass = document.getElementById("password").value;
+
+auth.signInWithEmailAndPassword(email,pass)
+.catch(err=>alert("Login gagal"));
 }
 
+// LOGOUT
+function logout(){
+auth.signOut();
+}
+
+// PARKIR AKTIF
 function showActive(){
+
 document.getElementById("activeList").innerHTML="Loading...";
 
 db.collection("parkir")
@@ -135,9 +173,7 @@ let html="<table><tr><th>QR</th><th>Check-in</th><th>Durasi</th></tr>";
 snapshot.forEach(doc=>{
 
 let d = doc.data();
-
 let checkin = d.checkinAt?.toDate?.() || new Date();
-
 let now = new Date();
 
 let durasi = Math.floor((now - checkin)/(1000*60*60*24))+1;
@@ -147,7 +183,6 @@ html += `<tr>
 <td>${checkin.toLocaleString("id-ID",{timeZone:"Asia/Jakarta"})}</td>
 <td>${durasi} hari</td>
 </tr>`;
-
 });
 
 html+="</table><br><button class='back' onclick='location.reload()'>Kembali</button>";
