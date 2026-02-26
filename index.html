@@ -7,10 +7,8 @@
 <link rel="manifest" href="manifest.json">
 
 <script src="https://unpkg.com/html5-qrcode"></script>
-
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 
 <style>
 body{font-family:Arial;background:#eee;text-align:center;margin:0;padding:15px}
@@ -23,9 +21,10 @@ button{width:90%;padding:16px;margin:10px auto;border:none;border-radius:12px;fo
 #manualBtn{background:#2b6cb0}
 #adminBtn{background:gray}
 #reader{width:80%;margin:auto;display:none}
-#manualBox{display:none}
-input{padding:10px;font-size:16px;width:150px}
-.iconBtn{padding:10px;width:auto;margin-left:5px}
+#manualBox{display:none;margin-top:10px}
+input{padding:10px;font-size:18px;width:80px;text-align:center}
+.iconBtn{padding:10px;width:auto;margin-left:5px;font-size:18px}
+.row{display:flex;justify-content:center;align-items:center}
 </style>
 </head>
 
@@ -45,10 +44,12 @@ input{padding:10px;font-size:16px;width:150px}
 <button id="manualBtn">Ketik Manual</button>
 
 <div id="manualBox">
-Parkir-
+<div class="row">
+<span>Parkir-</span>
 <input id="manualInput" maxlength="3" type="number">
 <button class="iconBtn" onclick="submitManual()">✓</button>
 <button class="iconBtn" onclick="cancelManual()">✕</button>
+</div>
 </div>
 
 <button id="adminBtn" onclick="location.href='admin.html'">Login Admin</button>
@@ -67,36 +68,34 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
 
 let scanner;
-let currentQR = null;
+let currentQR=null;
 
-document.getElementById("startBtn").onclick = startScan;
-document.getElementById("stopBtn").onclick = stopScan;
+startBtn.onclick=startScan;
+stopBtn.onclick=stopScan;
 
 function startScan(){
-document.getElementById("reader").style.display="block";
-document.getElementById("startBtn").style.display="none";
-document.getElementById("stopBtn").style.display="block";
+reader.style.display="block";
+startBtn.style.display="none";
+stopBtn.style.display="block";
 
-scanner = new Html5Qrcode("reader");
-scanner.start({ facingMode:"environment" }, { fps:10, qrbox:250 },
-qr=>{
-handleQR(qr);
-});
+scanner=new Html5Qrcode("reader");
+scanner.start({facingMode:"environment"},{fps:10,qrbox:250},
+qr=>handleQR(qr));
 }
 
 function stopScan(){
 scanner.stop();
-document.getElementById("reader").style.display="none";
-document.getElementById("startBtn").style.display="block";
-document.getElementById("stopBtn").style.display="none";
+reader.style.display="none";
+startBtn.style.display="block";
+stopBtn.style.display="none";
 }
 
 function handleQR(qr){
 if(!qr.startsWith("Parkir-")) return;
-currentQR = qr;
+currentQR=qr;
 
 db.collection("parkir").doc(qr).get().then(doc=>{
-if(!doc.exists || doc.data().status!="on"){
+if(!doc.exists){
 showCheckin();
 }else{
 showActive(doc.data().checkinAt.toDate());
@@ -105,28 +104,28 @@ showActive(doc.data().checkinAt.toDate());
 }
 
 function showCheckin(){
-document.getElementById("info").innerHTML="Belum aktif";
-document.getElementById("checkinBtn").style.display="block";
-document.getElementById("checkoutBtn").style.display="none";
-document.getElementById("cancelBtn").style.display="none";
+info.innerHTML="Belum aktif";
+checkinBtn.style.display="block";
+checkoutBtn.style.display="none";
+cancelBtn.style.display="none";
 }
 
 function showActive(date){
-let now = new Date();
-let durasi = Math.ceil((now-date)/(1000*60*60*24));
-let tarif = durasi*3000;
+let now=new Date();
+let durasi=Math.ceil((now-date)/(1000*60*60*24));
+let tarif=durasi*3000;
 
-document.getElementById("info").innerHTML=
+info.innerHTML=
 "Masuk: "+date.toLocaleString('id-ID')+
 "<br>Lama: "+durasi+" hari"+
 "<br>Tagihan: Rp "+tarif;
 
-document.getElementById("checkinBtn").style.display="none";
-document.getElementById("checkoutBtn").style.display="block";
-document.getElementById("cancelBtn").style.display="block";
+checkinBtn.style.display="none";
+checkoutBtn.style.display="block";
+cancelBtn.style.display="block";
 }
 
-document.getElementById("checkinBtn").onclick = ()=>{
+checkinBtn.onclick=()=>{
 db.collection("parkir").doc(currentQR).set({
 status:"on",
 checkinAt: firebase.firestore.Timestamp.now()
@@ -134,7 +133,7 @@ checkinAt: firebase.firestore.Timestamp.now()
 alert("Check-in sukses");
 };
 
-document.getElementById("checkoutBtn").onclick = ()=>{
+checkoutBtn.onclick=()=>{
 db.collection("checkout").add({
 qr:currentQR,
 bayar:3000,
@@ -144,24 +143,28 @@ db.collection("parkir").doc(currentQR).delete();
 alert("Checkout sukses");
 };
 
-document.getElementById("cancelBtn").onclick = ()=>{
+cancelBtn.onclick=()=>{
 db.collection("parkir").doc(currentQR).delete();
 alert("Dibatalkan");
 };
 
-document.getElementById("manualBtn").onclick = ()=>{
-document.getElementById("manualBox").style.display="block";
-document.getElementById("manualBtn").style.display="none";
+manualBtn.onclick=()=>{
+manualBox.style.display="block";
+manualBtn.style.display="none";
+manualInput.focus();
 };
 
 function submitManual(){
-handleQR("Parkir-"+document.getElementById("manualInput").value);
+let val=manualInput.value;
+if(val.length!=3){alert("Isi 3 digit");return;}
+handleQR("Parkir-"+val);
 cancelManual();
 }
 
 function cancelManual(){
-document.getElementById("manualBox").style.display="none";
-document.getElementById("manualBtn").style.display="block";
+manualBox.style.display="none";
+manualBtn.style.display="block";
+manualInput.value="";
 }
 </script>
 </body>
