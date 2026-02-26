@@ -106,9 +106,14 @@ padding:12px;
 </table>
 
 <button class="active" onclick="showActive()">Parkir Aktif</button>
-
+<button onclick="showHistory()">Laporan Sebelumnya</button>
+<div id="historyBox" style="display:none"></div>
 <div id="activeList"></div>
-
+<div id="tarifBox" style="margin-top:20px;background:white;padding:15px;border-radius:10px">
+<h3>Edit Tarif</h3>
+<input type="number" id="tarifInput" placeholder="Tarif per hari">
+<button class="active" onclick="saveTarif()">Simpan Tarif</button>
+</div>
 </div>
 
 <script>
@@ -175,7 +180,7 @@ snapshot.forEach(doc=>{
 
 let d = doc.data();
 let checkin = d.checkinAt?.toDate?.() || new Date();
-let now = new Date();
+let now = getWIBDate();
 
 let durasi = Math.floor((now - checkin)/(1000*60*60*24))+1;
 
@@ -335,6 +340,112 @@ d.setDate(1);
 d.setHours(0,0,0,0);
 return d;
 }
+</script>
+<script>
+
+// ================= RIWAYAT BULAN =================
+function showHistory(){
+
+document.getElementById("historyBox").style.display="block";
+
+let now = getWIBDate();
+
+let html = "<h3>Pilih Bulan</h3>";
+
+for(let i=1;i<=2;i++){
+
+let d = new Date(now);
+d.setMonth(now.getMonth()-i);
+
+let label = d.toLocaleString("id-ID",{month:"long",year:"numeric"});
+
+html += `<button onclick="loadMonth(${d.getFullYear()},${d.getMonth()})">
+${label}
+</button>`;
+}
+
+html += `<br><button class="back" onclick="closeHistory()">Kembali</button>`;
+
+document.getElementById("historyBox").innerHTML = html;
+
+}
+
+function closeHistory(){
+document.getElementById("historyBox").style.display="none";
+}
+
+// ================= LOAD BULAN =================
+function loadMonth(year,month){
+
+let start = new Date(year,month,1);
+let end = new Date(year,month+1,1);
+
+db.collection("checkout")
+.where("checkoutAt",">=",start)
+.where("checkoutAt","<",end)
+.get()
+.then(snap=>{
+
+let count = snap.size;
+let total = 0;
+
+snap.forEach(doc=>{
+total += doc.data().bayar || 0;
+});
+
+document.getElementById("historyBox").innerHTML = `
+<h3>${start.toLocaleString("id-ID",{month:"long",year:"numeric"})}</h3>
+<table>
+<tr><th>Checkout</th><th>Total</th></tr>
+<tr><td>${count}</td><td>${total}</td></tr>
+</table>
+<br>
+<button class="back" onclick="showHistory()">Kembali</button>
+`;
+
+});
+
+}
+
+</script>
+<script>
+
+// LOAD TARIF KE INPUT
+function loadTarifToInput(){
+db.collection("config").doc("tarif").get()
+.then(doc=>{
+if(doc.exists){
+document.getElementById("tarifInput").value = doc.data().perHari;
+}
+});
+}
+
+// SIMPAN TARIF
+function saveTarif(){
+
+let val = Number(document.getElementById("tarifInput").value);
+
+if(!val || val < 0){
+alert("Tarif tidak valid");
+return;
+}
+
+db.collection("config").doc("tarif").set({
+perHari: val
+})
+.then(()=>{
+alert("Tarif berhasil diupdate");
+});
+
+}
+
+// AUTO LOAD SAAT LOGIN
+auth.onAuthStateChanged(user=>{
+if(user){
+loadTarifToInput();
+}
+});
+
 </script>
 </body>
 </html>
