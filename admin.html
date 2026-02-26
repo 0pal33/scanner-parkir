@@ -1,57 +1,98 @@
+
 <!DOCTYPE html>
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin</title>
+
+<title>Dashboard</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 
 <style>
-body{text-align:center;font-family:Arial;background:#eee}
-input{padding:10px;margin:10px}
-button{padding:12px;margin:10px}
+body{
+font-family:Arial;
+background:#eee;
+text-align:center;
+margin:0;
+padding:15px;
+}
+
+table{
+width:100%;
+border-collapse:collapse;
+margin-top:20px;
+background:white;
+}
+
+td,th{
+border:1px solid #ccc;
+padding:12px;
+}
+
+button{
+padding:15px;
+border:none;
+border-radius:10px;
+margin:10px;
+width:90%;
+font-size:16px;
+color:white;
+}
+
+.logout{
+position:fixed;
+top:10px;
+right:10px;
+background:red;
+}
+
+.back{
+background:black;
+}
+
+.active{
+background:orange;
+}
 </style>
 </head>
+
 <body>
 
-<div id="loginBox">
-<input id="email" placeholder="Email"><br>
-<input id="pass" type="password" placeholder="Password"><br>
-<button onclick="login()">Login</button>
-<button onclick="location.href='index.html'">Batal</button>
-</div>
+<button class="logout" onclick="logout()">Logout</button>
 
-<div id="dashboard" style="display:none">
-<div id="activePage" style="display:none;">
-<h2>Parkir Aktif</h2>
-
-<table border="1" width="100%">
-<tr>
-<th>QR</th>
-<th>Check-in</th>
-<th>Durasi</th>
-</tr>
-<tbody id="activeList"></tbody>
-</table>
-
-<button onclick="backDashboard()" style="margin-top:10px;">
-Kembali
-</button>
-</div>
 <h2>Dashboard</h2>
-<table border="1" align="center">
-<tr><th></th><th>Checkout</th><th>Total</th></tr>
-<tr><td>Hari Ini</td><td id="hC">0</td><td id="hT">0</td></tr>
-<tr><td>Minggu Ini</td><td id="mC">0</td><td id="mT">0</td></tr>
-<tr><td>Bulan Ini</td><td id="bC">0</td><td id="bT">0</td></tr>
+
+<table>
+<tr>
+<th></th>
+<th>Checkout</th>
+<th>Total</th>
+</tr>
+
+<tr>
+<td>Hari Ini</td>
+<td id="d_checkout">0</td>
+<td id="d_total">0</td>
+</tr>
+
+<tr>
+<td>Minggu Ini</td>
+<td id="w_checkout">0</td>
+<td id="w_total">0</td>
+</tr>
+
+<tr>
+<td>Bulan Ini</td>
+<td id="m_checkout">0</td>
+<td id="m_total">0</td>
+</tr>
 </table>
-<button onclick="showActive()" style="background:#2196F3;margin-top:10px;">
-Parkir Aktif
-</button>
-<button onclick="logout()">Logout</button>
-</div>
+
+<button class="active" onclick="showActive()">Parkir Aktif</button>
+
+<div id="activeList"></div>
 
 <script>
 const firebaseConfig = {
@@ -65,98 +106,58 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
+const auth = firebase.auth();
+</script>
 
-function login(){
-firebase.auth().signInWithEmailAndPassword(
-document.getElementById("email").value,
-document.getElementById("pass").value
-).then(()=>{
-document.getElementById("loginBox").style.display="none";
-document.getElementById("dashboard").style.display="block";
-load();
-});
-}
+<script>
 
 function logout(){
-firebase.auth().signOut();
-location.reload();
-}
-
-function load(){
-let today=new Date().toDateString();
-
-db.collection("checkout").get().then(snap=>{
-let c=0,t=0;
-snap.forEach(d=>{
-let data=d.data();
-if(data.checkoutAt.toDate().toDateString()==today){
-c++; t+=data.bayar;
-}
-});
-document.getElementById("hC").innerText=c;
-document.getElementById("hT").innerText=t;
+auth.signOut().then(()=>{
+location.href="index.html";
 });
 }
+
 function showActive(){
+document.getElementById("activeList").innerHTML="Loading...";
 
-document.getElementById("dashboard").style.display="none";
-document.getElementById("activePage").style.display="block";
-
-loadActive();
-
-}
-function backDashboard(){
-
-document.getElementById("activePage").style.display="none";
-document.getElementById("dashboard").style.display="block";
-
-}
-async function loadActive(){
-
-const snapshot = await db.collection("parkir")
+db.collection("parkir")
 .where("status","==","on")
-.get();
+.get()
+.then(snapshot=>{
 
-let html = "";
-
-snapshot.forEach(doc => {
-
-const data = doc.data();
-
-const checkin = data.checkinAt?.toDate();
-
-if(!checkin) return;
-
-const now = new Date();
-
-let days = Math.floor((now - checkin) / 86400000);
-
-// aturan malam
-const hour = checkin.getHours();
-
-if(hour >=21){
-const tomorrow = new Date(checkin);
-tomorrow.setDate(tomorrow.getDate()+1);
-tomorrow.setHours(0,0,0,0);
-
-if(now < tomorrow){
-days = 0;
-}
+if(snapshot.empty){
+document.getElementById("activeList").innerHTML="Tidak ada parkir aktif";
+return;
 }
 
-html += `
-<tr>
+let html="<table><tr><th>QR</th><th>Check-in</th><th>Durasi</th></tr>";
+
+snapshot.forEach(doc=>{
+
+let d = doc.data();
+
+let checkin = d.checkinAt?.toDate?.() || new Date();
+
+let now = new Date();
+
+let durasi = Math.floor((now - checkin)/(1000*60*60*24))+1;
+
+html += `<tr>
 <td>${doc.id}</td>
-<td>${checkin.toLocaleString("id-ID")}</td>
-<td>${days} hari</td>
-</tr>
-`;
+<td>${checkin.toLocaleString("id-ID",{timeZone:"Asia/Jakarta"})}</td>
+<td>${durasi} hari</td>
+</tr>`;
 
 });
 
-document.getElementById("activeList").innerHTML = html;
+html+="</table><br><button class='back' onclick='location.reload()'>Kembali</button>";
 
+document.getElementById("activeList").innerHTML=html;
+
+});
 }
+
 </script>
+
 </body>
 </html>
