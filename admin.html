@@ -2,112 +2,34 @@
 <html>
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-
-<title>Dashboard Admin</title>
+<title>Dashboard</title>
 
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-auth-compat.js"></script>
 
 <style>
-body{
-font-family:Arial;
-background:#eee;
-margin:0;
-padding:20px;
-text-align:center;
-}
-
-.card{
-background:white;
-padding:20px;
-border-radius:16px;
-margin-top:15px;
-}
-
-button{
-width:100%;
-padding:16px;
-margin:8px 0;
-border:none;
-border-radius:12px;
-font-size:16px;
-color:white;
-}
-
-.logout{background:red;}
-.back{background:gray;}
-.active{background:#2ecc71;}
-.old{background:#3498db;}
-
-table{
-width:100%;
-border-collapse:collapse;
-margin-top:15px;
-}
-
-td,th{
-border:1px solid #ccc;
-padding:10px;
-}
+body{font-family:Arial;background:#eee;text-align:center;padding:20px;}
+table{width:100%;background:white;border-radius:12px;}
+td,th{padding:15px;}
+button{padding:15px;margin:10px;width:90%;}
 </style>
 </head>
 
 <body>
 
-<h2>Dashboard Admin</h2>
-<div id="role"></div>
+<h2>Dashboard</h2>
 
-<div class="card">
-<h3>Laporan</h3>
-
-<table>
-<tr>
-<th>Periode</th>
-<th>Checkout</th>
-<th>Total</th>
-</tr>
-
-<tr>
-<td>Hari Ini</td>
-<td id="hariCount">0</td>
-<td id="hariTotal">Rp 0</td>
-</tr>
-
-<tr>
-<td>Minggu Ini</td>
-<td id="mingguCount">0</td>
-<td id="mingguTotal">Rp 0</td>
-</tr>
-
-<tr>
-<td>Bulan Ini</td>
-<td id="bulanCount">0</td>
-<td id="bulanTotal">Rp 0</td>
-</tr>
-
+<table border="1">
+<tr><th></th><th>Checkout</th><th>Total</th></tr>
+<tr><td>Hari Ini</td><td id="d1">0</td><td id="t1">0</td></tr>
+<tr><td>Minggu Ini</td><td id="d2">0</td><td id="t2">0</td></tr>
+<tr><td>Bulan Ini</td><td id="d3">0</td><td id="t3">0</td></tr>
 </table>
 
-<button class="active" onclick="lihatAktif()">Parkir Aktif</button>
-<button class="old" onclick="lihatLama()">Laporan Sebelumnya</button>
-<button class="logout" onclick="logout()">Logout</button>
-
-</div>
-
-<div class="card" id="aktifBox" style="display:none">
-<h3>Parkir Aktif</h3>
-<div id="aktifList"></div>
-<button class="back" onclick="kembali()">Kembali</button>
-</div>
-
-<div class="card" id="lamaBox" style="display:none">
-<h3>Laporan Sebelumnya</h3>
-<div id="lamaList"></div>
-<button class="back" onclick="kembali()">Kembali</button>
-</div>
+<button onclick="logout()" style="background:red;color:white;">Logout</button>
 
 <script>
-
 const firebaseConfig = {
   apiKey: "AIzaSyCbB2eqYAxCM1DvkSyCyoqKwq39mvCBwCQ",
   authDomain: "parkir-demo.firebaseapp.com",
@@ -119,133 +41,20 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.firestore();
-const auth = firebase.auth();
 
-function logout(){
-auth.signOut().then(()=>location.href="index.html");
-}
-
-function kembali(){
-aktifBox.style.display="none";
-lamaBox.style.display="none";
-}
-
-function lihatAktif(){
-aktifBox.style.display="block";
-lamaBox.style.display="none";
-loadAktif();
-}
-
-function lihatLama(){
-lamaBox.style.display="block";
-aktifBox.style.display="none";
-loadLama();
-}
-
-auth.onAuthStateChanged(async user=>{
-
-if(!user){
-location.href="index.html";
-return;
-}
-
-let roleDoc = await db.collection("roles").doc(user.email).get();
-
-if(!roleDoc.exists){
-alert("Bukan admin");
-logout();
-return;
-}
-
-document.getElementById("role").innerHTML="Role: "+roleDoc.data().role;
-
-loadLaporan();
-
-});
-
-async function loadLaporan(){
-
-let now = new Date();
-
-let todayStart = new Date(now.getFullYear(),now.getMonth(),now.getDate());
-let weekStart = new Date(todayStart);
-weekStart.setDate(todayStart.getDate() - todayStart.getDay() + 1);
-
-let monthStart = new Date(now.getFullYear(),now.getMonth(),1);
-
-let snap = await db.collection("checkout").get();
-
-let hariC=0, mingguC=0, bulanC=0;
-let hariT=0, mingguT=0, bulanT=0;
-
-snap.forEach(doc=>{
+db.collection("checkout").get().then(snapshot=>{
+let today=0,week=0,month=0;
+snapshot.forEach(doc=>{
 let data=doc.data();
-let waktu = new Date(data.waktu);
-
-if(waktu>=todayStart){
-hariC++;
-hariT+=data.bayar;
-}
-
-if(waktu>=weekStart){
-mingguC++;
-mingguT+=data.bayar;
-}
-
-if(waktu>=monthStart){
-bulanC++;
-bulanT+=data.bayar;
-}
-
-});
-
-hariCount.innerText=hariC;
-mingguCount.innerText=mingguC;
-bulanCount.innerText=bulanC;
-
-hariTotal.innerText="Rp "+hariT;
-mingguTotal.innerText="Rp "+mingguT;
-bulanTotal.innerText="Rp "+bulanT;
-
-}
-
-async function loadAktif(){
-
-aktifList.innerHTML="Loading...";
-
-let snap = await db.collection("parkir").get();
-
-let html="";
-
-snap.forEach(doc=>{
-let d=doc.data();
-if(d.status=="on"){
-let masuk = d.checkinAt.toDate();
+let time=data.checkoutAt.toDate();
 let now=new Date();
-let hari=Math.ceil((now-masuk)/(1000*60*60*24));
-if(hari<1)hari=1;
 
-html+=`
-<div>
-${doc.id}<br>
-Masuk: ${masuk.toLocaleString("id-ID")}<br>
-Durasi: ${hari} hari
-<hr>
-</div>
-`;
+if(time.toDateString()==now.toDateString()){
+today++; document.getElementById("t1").innerText+=data.bayar;
 }
 });
-
-aktifList.innerHTML=html||"Tidak ada parkir aktif";
-
-}
-
-async function loadLama(){
-
-lamaList.innerHTML="Max 3 bulan terakhir";
-
-}
-
+document.getElementById("d1").innerText=today;
+});
 </script>
 
 </body>
