@@ -141,7 +141,7 @@ display:block;
 
 <h2>Parkir Aktif</h2>
 
-<div id="activeTable"></div>
+<div id="activeTable">Loading...</div>
 
 <button class="back" onclick="backToDashboard()">Kembali</button>
 
@@ -151,7 +151,7 @@ display:block;
 
 <h2>Laporan Sebelumnya</h2>
 
-<div id="historyButtons"></div>
+<div id="historyButtons">Loading...</div>
 
 <button class="back" onclick="backToDashboard()">Kembali</button>
 
@@ -188,9 +188,14 @@ const auth = firebase.auth();
 // AUTH CHECK
 auth.onAuthStateChanged(user=>{
 if(user){
+
 document.getElementById("loginPage").style.display="none";
 document.getElementById("dashboard").style.display="block";
-loadDashboard();   // ⬅ TAMBAHKAN INI
+
+// PASTIKAN DATA SIAP
+loadDashboard();
+loadTarifToInput();
+
 }else{
 document.getElementById("loginPage").style.display="block";
 document.getElementById("dashboard").style.display="none";
@@ -288,12 +293,6 @@ document.getElementById("m_total").innerText = total;
 
 }
 
-// AUTO LOAD
-auth.onAuthStateChanged(user=>{
-if(user){
-loadDashboard();
-}
-});
 
 // ================= AUTO CLEAN 3 BULAN =================
 function cleanOldData(){
@@ -386,12 +385,6 @@ alert("Tarif berhasil diupdate");
 
 }
 
-// AUTO LOAD SAAT LOGIN
-auth.onAuthStateChanged(user=>{
-if(user){
-loadTarifToInput();
-}
-});
 
 </script>
 <script>
