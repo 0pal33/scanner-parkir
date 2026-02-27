@@ -42,8 +42,15 @@ position:fixed;
 top:10px;
 right:10px;
 background:red;
+width:45px;
+height:45px;
+border-radius:10px;
+font-size:20px;
+padding:0;
+display:flex;
+align-items:center;
+justify-content:center;
 }
-.active{background:orange;}
 .back{background:black;}
 
 table{
@@ -56,6 +63,18 @@ background:white;
 td,th{
 border:1px solid #ccc;
 padding:12px;
+}
+.active{
+background:orange;
+color:white;
+font-weight:bold;
+}
+.monthBtn{
+background:#ff9800;
+font-weight:bold;
+width:90%;
+margin:10px auto;
+display:block;
 }
 </style>
 </head>
@@ -75,7 +94,7 @@ padding:12px;
 <!-- DASHBOARD -->
 <div id="dashboard" style="display:none">
 
-<button class="logout" onclick="logout()">Logout</button>
+<button class="logout" onclick="logout()">⏻</button>
 
 <h2>Dashboard</h2>
 
@@ -105,14 +124,47 @@ padding:12px;
 </tr>
 </table>
 
-<button class="active" onclick="showActive()">Parkir Aktif</button>
-<button onclick="showHistory()">Laporan Sebelumnya</button>
-<div id="historyBox" style="display:none"></div>
-<div id="activeList"></div>
+<button class="active" onclick="openActive()">Parkir Aktif</button>
+<button class="active" onclick="openHistory()">Laporan Sebelumnya</button>
+<script>
+
+
+
+</script>
 <div id="tarifBox" style="margin-top:20px;background:white;padding:15px;border-radius:10px">
 <h3>Edit Tarif</h3>
 <input type="number" id="tarifInput" placeholder="Tarif per hari">
 <button class="active" onclick="saveTarif()">Simpan Tarif</button>
+</div>
+<!-- PARKIR AKTIF PAGE -->
+<div id="activePage" style="display:none">
+
+<h2>Parkir Aktif</h2>
+
+<div id="activeTable"></div>
+
+<button class="back" onclick="backToDashboard()">Kembali</button>
+
+</div>
+<!-- HISTORY PAGE -->
+<div id="historyPage" style="display:none">
+
+<h2>Laporan Sebelumnya</h2>
+
+<div id="historyButtons"></div>
+
+<button class="back" onclick="backToDashboard()">Kembali</button>
+
+</div>
+<!-- MONTH PAGE -->
+<div id="monthPage" style="display:none">
+
+<h2 id="monthTitle"></h2>
+
+<div id="monthTable"></div>
+
+<button class="back" onclick="backToHistory()">Kembali</button>
+
 </div>
 </div>
 
@@ -157,45 +209,6 @@ auth.signInWithEmailAndPassword(email,pass)
 // LOGOUT
 function logout(){
 auth.signOut();
-}
-
-// PARKIR AKTIF
-function showActive(){
-
-document.getElementById("activeList").innerHTML="Loading...";
-
-db.collection("parkir")
-.where("status","==","on")
-.get()
-.then(snapshot=>{
-
-if(snapshot.empty){
-document.getElementById("activeList").innerHTML="Tidak ada parkir aktif";
-return;
-}
-
-let html="<table><tr><th>QR</th><th>Check-in</th><th>Durasi</th></tr>";
-
-snapshot.forEach(doc=>{
-
-let d = doc.data();
-let checkin = d.checkinAt?.toDate?.() || new Date();
-let now = getWIBDate();
-
-let durasi = Math.floor((now - checkin)/(1000*60*60*24))+1;
-
-html += `<tr>
-<td>${doc.id}</td>
-<td>${checkin.toLocaleString("id-ID",{timeZone:"Asia/Jakarta"})}</td>
-<td>${durasi} hari</td>
-</tr>`;
-});
-
-html+="</table><br><button class='back' onclick='location.reload()'>Kembali</button>";
-
-document.getElementById("activeList").innerHTML=html;
-
-});
 }
 
 </script>
@@ -341,73 +354,7 @@ d.setHours(0,0,0,0);
 return d;
 }
 </script>
-<script>
 
-// ================= RIWAYAT BULAN =================
-function showHistory(){
-
-document.getElementById("historyBox").style.display="block";
-
-let now = getWIBDate();
-
-let html = "<h3>Pilih Bulan</h3>";
-
-for(let i=1;i<=2;i++){
-
-let d = new Date(now);
-d.setMonth(now.getMonth()-i);
-
-let label = d.toLocaleString("id-ID",{month:"long",year:"numeric"});
-
-html += `<button onclick="loadMonth(${d.getFullYear()},${d.getMonth()})">
-${label}
-</button>`;
-}
-
-html += `<br><button class="back" onclick="closeHistory()">Kembali</button>`;
-
-document.getElementById("historyBox").innerHTML = html;
-
-}
-
-function closeHistory(){
-document.getElementById("historyBox").style.display="none";
-}
-
-// ================= LOAD BULAN =================
-function loadMonth(year,month){
-
-let start = new Date(year,month,1);
-let end = new Date(year,month+1,1);
-
-db.collection("checkout")
-.where("checkoutAt",">=",start)
-.where("checkoutAt","<",end)
-.get()
-.then(snap=>{
-
-let count = snap.size;
-let total = 0;
-
-snap.forEach(doc=>{
-total += doc.data().bayar || 0;
-});
-
-document.getElementById("historyBox").innerHTML = `
-<h3>${start.toLocaleString("id-ID",{month:"long",year:"numeric"})}</h3>
-<table>
-<tr><th>Checkout</th><th>Total</th></tr>
-<tr><td>${count}</td><td>${total}</td></tr>
-</table>
-<br>
-<button class="back" onclick="showHistory()">Kembali</button>
-`;
-
-});
-
-}
-
-</script>
 <script>
 
 // LOAD TARIF KE INPUT
@@ -446,6 +393,141 @@ loadTarifToInput();
 }
 });
 
+</script>
+<script>
+
+function openActive(){
+
+document.getElementById("dashboard").style.display="none";
+document.getElementById("activePage").style.display="block";
+
+loadActivePage();
+
+}
+
+function openHistory(){
+
+document.getElementById("dashboard").style.display="none";
+document.getElementById("historyPage").style.display="block";
+
+loadHistoryButtons();
+
+}
+
+function backToDashboard(){
+
+document.getElementById("dashboard").style.display="block";
+document.getElementById("activePage").style.display="none";
+document.getElementById("historyPage").style.display="none";
+document.getElementById("monthPage").style.display="none";
+
+}
+
+function backToHistory(){
+
+document.getElementById("historyPage").style.display="block";
+document.getElementById("monthPage").style.display="none";
+
+}
+</script>
+
+<script>
+function loadActivePage(){
+
+document.getElementById("activeTable").innerHTML="Loading...";
+
+db.collection("parkir")
+.where("status","==","on")
+.get()
+.then(snapshot=>{
+
+if(snapshot.empty){
+document.getElementById("activeTable").innerHTML="Tidak ada parkir aktif";
+return;
+}
+
+let html="<table><tr><th>QR</th><th>Check-in</th><th>Durasi</th></tr>";
+
+snapshot.forEach(doc=>{
+
+let d = doc.data();
+let checkin = d.checkinAt?.toDate?.() || new Date();
+let now = getWIBDate();
+
+let durasi = Math.floor((now - checkin)/(1000*60*60*24))+1;
+
+html += `<tr>
+<td>${doc.id}</td>
+<td>${checkin.toLocaleString("id-ID",{timeZone:"Asia/Jakarta"})}</td>
+<td>${durasi} hari</td>
+</tr>`;
+});
+
+html+="</table>";
+
+document.getElementById("activeTable").innerHTML=html;
+
+});
+
+}
+
+</script>
+<script>
+
+function loadHistoryButtons(){
+
+let now = getWIBDate();
+let html="";
+
+for(let i=1;i<=2;i++){
+
+let d = new Date(now);
+d.setMonth(now.getMonth()-i);
+
+let label = d.toLocaleString("id-ID",{month:"long",year:"numeric"});
+
+html += `<button class="monthBtn" onclick="openMonth(${d.getFullYear()},${d.getMonth()})">${label}</button>`;
+
+}
+
+document.getElementById("historyButtons").innerHTML=html;
+
+}
+
+function openMonth(year,month){
+
+document.getElementById("historyPage").style.display="none";
+document.getElementById("monthPage").style.display="block";
+
+let start = new Date(year,month,1);
+let end = new Date(year,month+1,1);
+
+document.getElementById("monthTitle").innerText =
+start.toLocaleString("id-ID",{month:"long",year:"numeric"});
+
+db.collection("checkout")
+.where("checkoutAt",">=",start)
+.where("checkoutAt","<",end)
+.get()
+.then(snap=>{
+
+let count = snap.size;
+let total = 0;
+
+snap.forEach(doc=>{
+total += doc.data().bayar || 0;
+});
+
+document.getElementById("monthTable").innerHTML = `
+<table>
+<tr><th>Checkout</th><th>Total</th></tr>
+<tr><td>${count}</td><td>${total}</td></tr>
+</table>
+`;
+
+});
+
+}
 </script>
 </body>
 </html>
